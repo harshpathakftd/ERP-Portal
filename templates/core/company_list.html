@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Company List</title>
+</head>
+
+<body>
+
+<h2>Company List</h2>
+
+{% for company in companies %}
+
+<hr>
+
+<h3>{{ company.name }}</h3>
+
+<p>Email: {{ company.email }}</p>
+
+<p>Phone: {{ company.phone }}</p>
+
+<p>Address: {{ company.address }}</p>
+
+{% empty %}
+
+<p>No companies found</p>
+
+{% endfor %}
+
+<br>
+<a href="/dashboard/">Back to Dashboard</a>
+
+</body>
+</html>

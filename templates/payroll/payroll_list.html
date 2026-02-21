@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Payroll List</title>
+</head>
+
+<body>
+
+<h2>Payroll List</h2>
+
+{% for payroll in payrolls %}
+
+<hr>
+
+<p>Employee: {{ payroll.employee.user.username }}</p>
+
+<p>Basic Salary: {{ payroll.basic_salary }}</p>
+
+<p>Bonus: {{ payroll.bonus }}</p>
+
+<p>Deduction: {{ payroll.deduction }}</p>
+
+<p>Net Salary: {{ payroll.net_salary }}</p>
+
+<p>Pay Date: {{ payroll.pay_date }}</p>
+
+{% empty %}
+
+<p>No payroll records found</p>
+
+{% endfor %}
+
+<br>
+<a href="/dashboard/">Back to Dashboard</a>
+
+</body>
+</html>

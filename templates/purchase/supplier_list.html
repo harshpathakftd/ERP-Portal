@@ -1,0 +1,11 @@
+<h2>Supplier List</h2>
+
+{% for supplier in suppliers %}
+
+<p>Name: {{ supplier.name }}</p>
+<p>Email: {{ supplier.email }}</p>
+<p>Phone: {{ supplier.phone }}</p>
+
+<hr>
+
+{% endfor %}

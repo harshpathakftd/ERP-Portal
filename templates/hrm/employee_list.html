@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Employee List</title>
+</head>
+
+<body>
+
+<h2>Employee List</h2>
+
+{% for emp in employees %}
+
+<hr>
+
+<p>Username: {{ emp.user.username }}</p>
+
+<p>Department: {{ emp.department.name }}</p>
+
+<p>Salary: {{ emp.salary }}</p>
+
+<p>Joining Date: {{ emp.joining_date }}</p>
+
+{% empty %}
+
+<p>No employees found</p>
+
+{% endfor %}
+
+<br>
+<a href="/dashboard/">Back to Dashboard</a>
+
+</body>
+</html>

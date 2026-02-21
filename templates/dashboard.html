@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>ERP Dashboard</title>
+
+<style>
+
+body{
+font-family:Arial;
+margin:0;
+background:#f4f6f9;
+}
+
+.navbar{
+background:#2c3e50;
+color:white;
+padding:15px;
+}
+
+.sidebar{
+width:200px;
+background:#34495e;
+height:100vh;
+float:left;
+}
+
+.sidebar a{
+display:block;
+color:white;
+padding:12px;
+text-decoration:none;
+}
+
+.sidebar a:hover{
+background:#2c3e50;
+}
+
+.content{
+margin-left:210px;
+padding:20px;
+}
+
+.card{
+background:white;
+padding:20px;
+margin-bottom:10px;
+box-shadow:0 0 5px gray;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="navbar">
+<h2>Enterprise ERP Dashboard</h2>
+</div>
+
+<div class="sidebar">
+
+<a href="/dashboard/">Dashboard</a>
+<a href="/companies/">Companies</a>
+<a href="/hrm/employees/">Employees</a>
+<a href="/inventory/products/">Products</a>
+<a href="/sales/orders/">Orders</a>
+<a href="/logout/">Logout</a>
+
+</div>
+
+<div class="content">
+
+<div class="card">
+<h3>Total Companies: {{ total_company }}</h3>
+</div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,15 @@
+<h2>Invoice List</h2>
+
+{% for invoice in invoices %}
+
+<p>Invoice: {{ invoice.invoice_number }}</p>
+
+<p>Order ID: {{ invoice.order.id }}</p>
+
+<p>Amount: {{ invoice.amount }}</p>
+
+<p>Status: {{ invoice.status }}</p>
+
+<hr>
+
+{% endfor %}

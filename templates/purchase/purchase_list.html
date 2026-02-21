@@ -1,0 +1,12 @@
+<h2>Purchase List</h2>
+
+{% for purchase in purchases %}
+
+<p>Purchase ID: {{ purchase.id }}</p>
+<p>Supplier: {{ purchase.supplier.name }}</p>
+<p>Total: {{ purchase.total }}</p>
+<p>Date: {{ purchase.date }}</p>
+
+<hr>
+
+{% endfor %}
