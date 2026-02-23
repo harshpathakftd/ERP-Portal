@@ -6,7 +6,7 @@ environment {
 
     DOCKER_IMAGE = "shivsoftapp/devops-sonarqube-image"
     DOCKER_TAG = "33"
-    SONAR_HOST = "http://host.docker.internal:9000"
+    SONAR_HOST = "http://localhost:9000"
 
 }
 
