@@ -1,53 +1,34 @@
 terraform {
 
   required_providers {
-
     kubernetes = {
       source  = "hashicorp/kubernetes"
       version = "~> 2.23"
     }
-
   }
-
 }
 
 provider "kubernetes" {
-
   config_path = "~/.kube/config"
-
 }
 
-# ============================
-# Create Namespace
-# ============================
-
+# Namespace
 resource "kubernetes_namespace" "devops_ns" {
-
   metadata {
-
     name = "devops-sonarqube"
-
   }
-
 }
 
-# ============================
-# Create Deployment
-# ============================
-
+# Deployment
 resource "kubernetes_deployment" "devops_app" {
 
   metadata {
-
     name      = "devops-sonarqube-app"
     namespace = kubernetes_namespace.devops_ns.metadata[0].name
 
     labels = {
-
       app = "devops-sonarqube"
-
     }
-
   }
 
   spec {
@@ -55,25 +36,17 @@ resource "kubernetes_deployment" "devops_app" {
     replicas = 2
 
     selector {
-
       match_labels = {
-
         app = "devops-sonarqube"
-
       }
-
     }
 
     template {
 
       metadata {
-
         labels = {
-
           app = "devops-sonarqube"
-
         }
-
       }
 
       spec {
@@ -83,10 +56,10 @@ resource "kubernetes_deployment" "devops_app" {
           name  = "devops-container"
           image = "shivsoftapp/devops-sonarqube-image:33"
 
+          image_pull_policy = "Always"
+
           port {
-
-            container_port = 5000
-
+            container_port = 8000
           }
 
         }
@@ -99,33 +72,24 @@ resource "kubernetes_deployment" "devops_app" {
 
 }
 
-# ============================
-# Create Service
-# ============================
-
+# Service
 resource "kubernetes_service" "devops_service" {
 
   metadata {
-
     name      = "devops-sonarqube-service"
     namespace = kubernetes_namespace.devops_ns.metadata[0].name
-
   }
 
   spec {
 
     selector = {
-
       app = "devops-sonarqube"
-
     }
 
     port {
-
-      port        = 5000
-      target_port = 5000
+      port        = 8000
+      target_port = 8000
       node_port   = 30007
-
     }
 
     type = "NodePort"
