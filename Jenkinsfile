@@ -5,8 +5,8 @@ agent any
 environment {
 
     DOCKER_IMAGE = "shivsoftapp/devops-sonarqube-image"
-    DOCKER_TAG = "33"
-    SONAR_HOST = "http://host.docker.internal:9000"
+    DOCKER_TAG   = "33"
+    SONAR_HOST   = "http://host.docker.internal:9000"
 
 }
 
@@ -37,6 +37,14 @@ stages {
         }
     }
 
+    stage('Create Sonar Cache Volume') {
+        steps {
+            bat '''
+            docker volume inspect sonar-cache >nul 2>&1 || docker volume create sonar-cache
+            '''
+        }
+    }
+
     stage('SonarQube Scan') {
         steps {
 
@@ -48,9 +56,11 @@ stages {
                 docker run --rm ^
                 --add-host host.docker.internal:host-gateway ^
                 -v %cd%:/usr/src ^
+                -v sonar-cache:/opt/sonar-scanner/.sonar ^
                 sonarsource/sonar-scanner-cli ^
                 -Dsonar.host.url=%SONAR_HOST% ^
-                -Dsonar.login=%SONAR_TOKEN%
+                -Dsonar.login=%SONAR_TOKEN% ^
+                -Dsonar.ws.timeout=300
                 """
 
             }
