@@ -1,34 +1,49 @@
 terraform {
 
   required_providers {
+
     kubernetes = {
       source  = "hashicorp/kubernetes"
       version = "~> 2.23"
     }
+
   }
+
 }
+
+# IMPORTANT: Do NOT use config_path
+# Jenkins will provide kubeconfig via KUBECONFIG environment variable
 
 provider "kubernetes" {
-  config_path = "~/.kube/config"
 }
 
+# ============================
 # Namespace
+# ============================
+
 resource "kubernetes_namespace" "devops_ns" {
+
   metadata {
     name = "devops-sonarqube"
   }
+
 }
 
+# ============================
 # Deployment
+# ============================
+
 resource "kubernetes_deployment" "devops_app" {
 
   metadata {
+
     name      = "devops-sonarqube-app"
     namespace = kubernetes_namespace.devops_ns.metadata[0].name
 
     labels = {
       app = "devops-sonarqube"
     }
+
   }
 
   spec {
@@ -62,6 +77,22 @@ resource "kubernetes_deployment" "devops_app" {
             container_port = 8000
           }
 
+          # Recommended resources for production
+
+          resources {
+
+            limits = {
+              cpu    = "500m"
+              memory = "512Mi"
+            }
+
+            requests = {
+              cpu    = "250m"
+              memory = "256Mi"
+            }
+
+          }
+
         }
 
       }
@@ -72,12 +103,17 @@ resource "kubernetes_deployment" "devops_app" {
 
 }
 
+# ============================
 # Service
+# ============================
+
 resource "kubernetes_service" "devops_service" {
 
   metadata {
+
     name      = "devops-sonarqube-service"
     namespace = kubernetes_namespace.devops_ns.metadata[0].name
+
   }
 
   spec {
@@ -87,9 +123,11 @@ resource "kubernetes_service" "devops_service" {
     }
 
     port {
+
       port        = 8000
       target_port = 8000
       node_port   = 30007
+
     }
 
     type = "NodePort"
