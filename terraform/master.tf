@@ -85,7 +85,7 @@ resource "kubernetes_deployment" "devops_app" {
 
           port {
 
-            container_port = 5000
+            container_port = 8000
 
           }
 
@@ -122,8 +122,8 @@ resource "kubernetes_service" "devops_service" {
 
     port {
 
-      port        = 5000
-      target_port = 5000
+      port        = 8000
+      target_port = 8000
       node_port   = 30007
 
     }
