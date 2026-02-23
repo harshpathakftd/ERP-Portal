@@ -1,12 +1,13 @@
 pipeline {
 
+```
 agent any
 
 environment {
 
     DOCKER_IMAGE = "shivsoftapp/devops-sonarqube-image"
     DOCKER_TAG = "33"
-    SONAR_HOST = "http://localhost:9000"
+    SONAR_HOST = "http://host.docker.internal:9000"
 
 }
 
@@ -46,6 +47,7 @@ stages {
 
                 bat """
                 docker run --rm ^
+                --add-host host.docker.internal:host-gateway ^
                 -v %cd%:/usr/src ^
                 sonarsource/sonar-scanner-cli ^
                 -Dsonar.host.url=%SONAR_HOST% ^
@@ -179,5 +181,6 @@ post {
     }
 
 }
+```
 
 }
