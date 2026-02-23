@@ -1,149 +1,110 @@
 pipeline {
 
-    agent any
+```
+agent any
 
-    environment {
+environment {
 
-        DOCKER_IMAGE = "shivsoftapp/devops-sonarqube-image"
-        DOCKER_TAG = "33"
+    DOCKER_IMAGE = "shivsoftapp/devops-sonarqube-image"
+    DOCKER_TAG = "33"
+    SONAR_HOST = "http://host.docker.internal:9000"
 
-        SONAR_HOST = "http://host.docker.internal:9000"
+}
 
+stages {
+
+    stage('Clean Workspace') {
+        steps {
+            deleteDir()
+        }
     }
 
-    stages {
-
-        stage('Clean Workspace') {
-
-            steps {
-                deleteDir()
-            }
-
+    stage('Clone GitLab Repository') {
+        steps {
+            echo "Cloning GitLab Repository..."
+            git branch: 'main',
+            url: 'https://gitlab.com/SOFTAPP-TECHNOLOGIES/complete-industry-level-devops-ci-cd-pipeline-with-sonarqube.git'
         }
+    }
 
-        stage('Clone GitLab Repository') {
-
-            steps {
-
-                echo "Cloning GitLab Repository..."
-
-                git branch: 'main',
-                url: 'https://gitlab.com/SOFTAPP-TECHNOLOGIES/complete-industry-level-devops-ci-cd-pipeline-with-sonarqube.git'
-
-            }
-
+    stage('Verify Files') {
+        steps {
+            bat '''
+            echo ===================================
+            echo Verifying Workspace Files
+            echo ===================================
+            dir
+            '''
         }
+    }
 
-        stage('Verify Files') {
+    stage('SonarQube Scan') {
+        steps {
 
-            steps {
+            echo "Running SonarQube Scan..."
 
-                bat '''
-                echo ===================================
-                echo Verifying Workspace Files
-                echo ===================================
-                dir
-                '''
-
-            }
-
-        }
-
-        stage('SonarQube Scan') {
-
-            steps {
-
-                echo "Running SonarQube Scan..."
-
-                withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-
-                    bat """
-                    docker run --rm ^
-                    -v %cd%:/usr/src ^
-                    sonarsource/sonar-scanner-cli ^
-                    -Dsonar.host.url=%SONAR_HOST% ^
-                    -Dsonar.login=%SONAR_TOKEN%
-                    """
-
-                }
-
-            }
-
-        }
-
-        stage('Build Docker Image') {
-
-            steps {
-
-                echo "Building Docker Image..."
+            withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
 
                 bat """
-                docker build -t %DOCKER_IMAGE%:%DOCKER_TAG% app
+                docker run --rm ^
+                -v %cd%:/usr/src ^
+                sonarsource/sonar-scanner-cli ^
+                -Dsonar.host.url=%SONAR_HOST% ^
+                -Dsonar.login=%SONAR_TOKEN%
                 """
 
             }
-
         }
+    }
 
-        stage('DockerHub Login') {
-
-            steps {
-
-                echo "Logging into DockerHub..."
-
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-creds',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-
-                    bat """
-                    echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
-                    """
-
-                }
-
-            }
-
+    stage('Build Docker Image') {
+        steps {
+            echo "Building Docker Image..."
+            bat "docker build -t %DOCKER_IMAGE%:%DOCKER_TAG% app"
         }
+    }
 
-        stage('Push Docker Image') {
+    stage('DockerHub Login') {
+        steps {
 
-            steps {
+            echo "Logging into DockerHub..."
 
-                echo "Pushing Docker Image..."
+            withCredentials([usernamePassword(
+                credentialsId: 'dockerhub-creds',
+                usernameVariable: 'DOCKER_USER',
+                passwordVariable: 'DOCKER_PASS'
+            )]) {
 
                 bat """
-                docker push %DOCKER_IMAGE%:%DOCKER_TAG%
+                echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
                 """
 
             }
-
         }
+    }
 
-        stage('Terraform Init') {
+    stage('Push Docker Image') {
+        steps {
+            echo "Pushing Docker Image..."
+            bat "docker push %DOCKER_IMAGE%:%DOCKER_TAG%"
+        }
+    }
 
-            steps {
+    stage('Terraform Deploy to Kubernetes') {
 
-                echo "Initializing Terraform..."
+        steps {
+
+            echo "Deploying Infrastructure using Terraform..."
+
+            withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
 
                 bat """
+                set KUBECONFIG=%KUBECONFIG_FILE%
+
                 cd terraform
+
                 terraform init
-                """
 
-            }
-
-        }
-
-        stage('Terraform Apply') {
-
-            steps {
-
-                echo "Applying Terraform Infrastructure..."
-
-                bat """
-                cd terraform
                 terraform apply -auto-approve
                 """
 
@@ -151,71 +112,25 @@ pipeline {
 
         }
 
-        stage('Deploy to Kubernetes') {
+    }
 
-            steps {
+    stage('Verify Kubernetes Deployment') {
 
-                echo "Deploying Application to Kubernetes..."
+        steps {
 
-                bat """
-                kubectl apply -f k8s/deployment.yaml
-                kubectl apply -f k8s/service.yaml
-                """
+            echo "Verifying Kubernetes Deployment..."
 
-            }
-
-        }
-
-        stage('Verify Kubernetes Deployment') {
-
-            steps {
-
-                echo "Verifying Kubernetes Deployment..."
+            withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
 
                 bat """
-                kubectl get pods
-                kubectl get services
+                set KUBECONFIG=%KUBECONFIG_FILE%
+
+                kubectl get namespaces
+
+                kubectl get pods -n devops-sonarqube
+
+                kubectl get svc -n devops-sonarqube
                 """
-
-            }
-
-        }
-
-        stage('Monitoring Verification (SonarQube, Prometheus, Grafana)') {
-
-            steps {
-
-                echo "Verifying Monitoring Stack..."
-
-                bat '''
-                echo ===================================
-                echo Checking SonarQube Container
-                echo ===================================
-                docker ps | findstr sonarqube || (
-                    echo ERROR: SonarQube container not running
-                    exit 1
-                )
-
-                echo ===================================
-                echo Checking Prometheus Container
-                echo ===================================
-                docker ps | findstr prometheus || (
-                    echo ERROR: Prometheus container not running
-                    exit 1
-                )
-
-                echo ===================================
-                echo Checking Grafana Container
-                echo ===================================
-                docker ps | findstr grafana || (
-                    echo ERROR: Grafana container not running
-                    exit 1
-                )
-
-                echo ===================================
-                echo Monitoring Stack Verification SUCCESS
-                echo ===================================
-                '''
 
             }
 
@@ -223,20 +138,48 @@ pipeline {
 
     }
 
-    post {
+    stage('Monitoring Verification (SonarQube, Prometheus, Grafana)') {
 
-        success {
+        steps {
 
-            echo "SUCCESS: Full DevOps CI/CD Pipeline executed successfully!"
+            bat '''
+            echo ===================================
+            echo Checking SonarQube Container
+            echo ===================================
+            docker ps | findstr sonarqube || exit 1
 
-        }
+            echo ===================================
+            echo Checking Prometheus Container
+            echo ===================================
+            docker ps | findstr prometheus || exit 1
 
-        failure {
+            echo ===================================
+            echo Checking Grafana Container
+            echo ===================================
+            docker ps | findstr grafana || exit 1
 
-            echo "FAILED: Pipeline execution failed. Check Jenkins console logs."
+            echo ===================================
+            echo Monitoring Stack Verification SUCCESS
+            echo ===================================
+            '''
 
         }
 
     }
+
+}
+
+post {
+
+    success {
+        echo "SUCCESS: Full DevOps CI/CD Pipeline executed successfully!"
+    }
+
+    failure {
+        echo "FAILED: Pipeline execution failed. Check Jenkins console logs."
+    }
+
+}
+```
 
 }
