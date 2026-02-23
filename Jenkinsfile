@@ -1,6 +1,5 @@
 pipeline {
 
-```
 agent any
 
 environment {
@@ -181,6 +180,5 @@ post {
     }
 
 }
-```
 
 }
