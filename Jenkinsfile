@@ -37,10 +37,11 @@ stages {
         }
     }
 
-    stage('Create Sonar Cache Volume') {
+    stage('Create SonarQube Cache Volumes') {
         steps {
             bat '''
             docker volume inspect sonar-cache >nul 2>&1 || docker volume create sonar-cache
+            docker volume inspect sonar-engine-cache >nul 2>&1 || docker volume create sonar-engine-cache
             '''
         }
     }
@@ -55,15 +56,17 @@ stages {
                 bat """
                 docker run --rm ^
                 --add-host host.docker.internal:host-gateway ^
+                -e SONAR_SCANNER_OPTS="-Dsonar.scanner.socketTimeout=600 -Dsonar.scanner.connectTimeout=600" ^
                 -v %cd%:/usr/src ^
                 -v sonar-cache:/opt/sonar-scanner/.sonar ^
+                -v sonar-engine-cache:/opt/sonar-scanner/.cache ^
                 sonarsource/sonar-scanner-cli ^
                 -Dsonar.host.url=%SONAR_HOST% ^
-                -Dsonar.login=%SONAR_TOKEN% ^
-                -Dsonar.ws.timeout=300
+                -Dsonar.login=%SONAR_TOKEN%
                 """
 
             }
+
         }
     }
 
@@ -90,6 +93,7 @@ stages {
                 """
 
             }
+
         }
     }
 
@@ -148,28 +152,28 @@ stages {
 
     }
 
-    stage('Monitoring Verification (SonarQube, Prometheus, Grafana)') {
+    stage('Monitoring Verification') {
 
         steps {
 
             bat '''
             echo ===================================
-            echo Checking SonarQube Container
+            echo Checking SonarQube
             echo ===================================
             docker ps | findstr sonarqube || exit 1
 
             echo ===================================
-            echo Checking Prometheus Container
+            echo Checking Prometheus
             echo ===================================
             docker ps | findstr prometheus || exit 1
 
             echo ===================================
-            echo Checking Grafana Container
+            echo Checking Grafana
             echo ===================================
             docker ps | findstr grafana || exit 1
 
             echo ===================================
-            echo Monitoring Stack Verification SUCCESS
+            echo Monitoring Verification SUCCESS
             echo ===================================
             '''
 
@@ -186,9 +190,10 @@ post {
     }
 
     failure {
-        echo "FAILED: Pipeline execution failed. Check Jenkins console logs."
+        echo "FAILED: Pipeline execution failed. Check Jenkins logs."
     }
 
 }
+
 
 }
