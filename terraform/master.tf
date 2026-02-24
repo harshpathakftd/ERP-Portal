@@ -1,148 +1,265 @@
-terraform {
+pipeline {
 
-  required_providers {
+agent any
 
-    kubernetes = {
-      source  = "hashicorp/kubernetes"
-      version = "~> 2.23"
-    }
+environment {
 
-  }
+    // Docker Configuration
+    DOCKER_IMAGE = "shivsoftapp/devops-sonarqube-image"
+    DOCKER_TAG = "555"
 
-}
+    // SonarQube
+    SONAR_HOST = "http://host.docker.internal:9000"
 
-# Kubernetes provider
-# KUBECONFIG will be provided by Jenkins credential
-provider "kubernetes" {
-}
+    // Terraform directory
+    TERRAFORM_DIR = "terraform"
 
-# ============================
-# Variable for Docker Image
-# ============================
-
-variable "docker_image" {
-  description = "Docker image with tag"
-  default     = "shivsoftapp/devops-sonarqube-image:33"
-}
-
-# ============================
-# Namespace
-# ============================
-
-resource "kubernetes_namespace" "devops_ns" {
-
-  metadata {
-    name = "devops-sonarqube"
-  }
+    // Kubernetes namespace
+    K8S_NAMESPACE = "devops-sonarqube"
 
 }
 
-# ============================
-# Deployment
-# ============================
+stages {
 
-resource "kubernetes_deployment" "devops_app" {
+    stage('Clean Workspace') {
 
-  metadata {
+        steps {
 
-    name      = "devops-sonarqube-app"
-    namespace = kubernetes_namespace.devops_ns.metadata[0].name
-
-    labels = {
-      app = "devops-sonarqube"
-    }
-
-  }
-
-  spec {
-
-    replicas = 2
-
-    selector {
-      match_labels = {
-        app = "devops-sonarqube"
-      }
-    }
-
-    template {
-
-      metadata {
-        labels = {
-          app = "devops-sonarqube"
-        }
-      }
-
-      spec {
-
-        container {
-
-          name              = "devops-container"
-          image             = var.docker_image
-          image_pull_policy = "Always"
-
-          port {
-            container_port = 8000
-          }
+            echo "STEP 1: Cleaning Workspace..."
+            deleteDir()
 
         }
+    }
 
-      }
+    stage('Clone GitLab Repository') {
+
+        steps {
+
+            echo "STEP 2: Cloning GitLab Repository..."
+
+            git branch: 'main',
+            url: 'https://gitlab.com/SOFTAPP-TECHNOLOGIES/complete-industry-level-devops-ci-cd-pipeline-with-sonarqube.git'
+
+        }
+    }
+
+    stage('Verify Project Files') {
+
+        steps {
+
+            echo "STEP 3: Verifying Files..."
+
+            bat '''
+            echo ================================
+            echo Workspace Files:
+            echo ================================
+            dir
+            '''
+
+        }
+    }
+
+    stage('SonarQube Code Scan') {
+
+        steps {
+
+            echo "STEP 4: Running SonarQube Scan..."
+
+            withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+
+                bat """
+                docker run --rm ^
+                --add-host=host.docker.internal:host-gateway ^
+                -v %WORKSPACE%:/usr/src ^
+                sonarsource/sonar-scanner-cli ^
+                -Dsonar.projectKey=devops-sonarqube-project ^
+                -Dsonar.sources=. ^
+                -Dsonar.host.url=%SONAR_HOST% ^
+                -Dsonar.login=%SONAR_TOKEN%
+                """
+
+            }
+
+        }
+    }
+
+    stage('Build Docker Image') {
+
+        steps {
+
+            echo "STEP 5: Building Docker Image..."
+
+            bat """
+            docker build -t %DOCKER_IMAGE%:%DOCKER_TAG% .
+            docker tag %DOCKER_IMAGE%:%DOCKER_TAG% %DOCKER_IMAGE%:latest
+            """
+
+        }
+    }
+
+    stage('DockerHub Login') {
+
+        steps {
+
+            echo "STEP 6: Logging into DockerHub..."
+
+            withCredentials([usernamePassword(
+                credentialsId: 'dockerhub-creds',
+                usernameVariable: 'DOCKER_USER',
+                passwordVariable: 'DOCKER_PASS'
+            )]) {
+
+                bat """
+                echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
+                """
+
+            }
+
+        }
+    }
+
+    stage('Push Docker Image to DockerHub') {
+
+        steps {
+
+            echo "STEP 7: Pushing Docker Image..."
+
+            bat """
+            docker push %DOCKER_IMAGE%:%DOCKER_TAG%
+            docker push %DOCKER_IMAGE%:latest
+            """
+
+        }
+    }
+
+    stage('Terraform Init') {
+
+        steps {
+
+            echo "STEP 8: Terraform Initialization..."
+
+            bat """
+            cd %TERRAFORM_DIR%
+            terraform init
+            """
+
+        }
+    }
+
+    stage('Terraform Apply (Deploy to Kubernetes)') {
+
+        steps {
+
+            echo "STEP 9: Deploying to Kubernetes using Terraform..."
+
+            withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
+
+                bat """
+                cd %TERRAFORM_DIR%
+
+                set KUBECONFIG=%KUBECONFIG_FILE%
+
+                terraform apply ^
+                -var="docker_image=%DOCKER_IMAGE%:%DOCKER_TAG%" ^
+                -auto-approve
+                """
+
+            }
+
+        }
+    }
+
+    stage('Verify Kubernetes Deployment') {
+
+        steps {
+
+            echo "STEP 10: Verifying Kubernetes Deployment..."
+
+            withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
+
+                bat """
+                set KUBECONFIG=%KUBECONFIG_FILE%
+
+                echo ================================
+                echo Namespaces
+                echo ================================
+                kubectl get namespaces
+
+                echo ================================
+                echo Deployments
+                echo ================================
+                kubectl get deployment -n %K8S_NAMESPACE%
+
+                echo ================================
+                echo Pods
+                echo ================================
+                kubectl get pods -n %K8S_NAMESPACE%
+
+                echo ================================
+                echo Services
+                echo ================================
+                kubectl get services -n %K8S_NAMESPACE%
+                """
+
+            }
+
+        }
+    }
+
+    stage('Verify Monitoring Stack') {
+
+        steps {
+
+            echo "STEP 11: Verifying Monitoring Stack..."
+
+            bat '''
+            echo ================================
+            echo Checking SonarQube
+            echo ================================
+            docker ps | findstr sonarqube
+
+            echo ================================
+            echo Checking Prometheus
+            echo ================================
+            docker ps | findstr prometheus
+
+            echo ================================
+            echo Checking Grafana
+            echo ================================
+            docker ps | findstr grafana
+
+            echo ================================
+            echo Monitoring Verification Complete
+            echo ================================
+            '''
+
+        }
+    }
+
+}
+
+post {
+
+    success {
+
+        echo "SUCCESS: CI/CD Pipeline executed successfully!"
+        echo "Docker Image: %DOCKER_IMAGE%:%DOCKER_TAG%"
+        echo "Application deployed to Kubernetes"
 
     }
 
-  }
+    failure {
 
-}
-
-# ============================
-# Service
-# ============================
-
-resource "kubernetes_service" "devops_service" {
-
-  metadata {
-
-    name      = "devops-sonarqube-service"
-    namespace = kubernetes_namespace.devops_ns.metadata[0].name
-
-  }
-
-  spec {
-
-    selector = {
-      app = "devops-sonarqube"
-    }
-
-    port {
-
-      port        = 8000
-      target_port = 8000
-      node_port   = 30007
+        echo "FAILED: Pipeline execution failed. Check logs."
 
     }
 
-    type = "NodePort"
+    always {
 
-  }
+        echo "Pipeline execution finished."
+
+    }
 
 }
 
-# ============================
-# Outputs
-# ============================
-
-output "namespace" {
-  value = kubernetes_namespace.devops_ns.metadata[0].name
-}
-
-output "deployment_name" {
-  value = kubernetes_deployment.devops_app.metadata[0].name
-}
-
-output "service_name" {
-  value = kubernetes_service.devops_service.metadata[0].name
-}
-
-output "service_node_port" {
-  value = kubernetes_service.devops_service.spec[0].port[0].node_port
 }
