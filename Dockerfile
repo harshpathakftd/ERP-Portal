@@ -14,12 +14,7 @@ WORKDIR /app
 
 # Install system dependencies
 
-RUN apt-get update && apt-get install -y 
-build-essential 
-gcc 
-netcat-openbsd 
-&& apt-get clean 
-&& rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y build-essential gcc netcat-openbsd && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip
 
@@ -29,19 +24,18 @@ RUN pip install --upgrade pip
 
 COPY erp.txt .
 
-# Install Python dependencies
+# Install dependencies
 
-RUN pip install --no-cache-dir -r erp.txt && 
-pip install --no-cache-dir gunicorn
+RUN pip install --no-cache-dir -r erp.txt gunicorn
 
 # Copy project files
 
 COPY . .
 
-# Expose port (must match Kubernetes and Terraform)
+# Expose port
 
 EXPOSE 8000
 
-# Start Django production server
+# Start Django using your project name erp_project
 
 CMD sh -c "python manage.py migrate --noinput && python manage.py collectstatic --noinput && gunicorn erp_project.wsgi:application --bind 0.0.0.0:8000 --workers 3"
