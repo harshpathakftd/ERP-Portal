@@ -8,7 +8,7 @@ environment {
     DOCKER_IMAGE = "shivsoftapp/devops-sonarqube-image"
     DOCKER_TAG = "555"
 
-    // SonarQube
+    // SonarQube URL (Windows Docker Desktop compatible)
     SONAR_HOST = "http://host.docker.internal:9000"
 
     // Terraform directory
@@ -41,35 +41,53 @@ stages {
             echo "STEP 3: Verifying Files..."
             bat '''
             echo ================================
-            echo Workspace Files:
+            echo Workspace Files
             echo ================================
             dir
             '''
         }
     }
 
+    stage('Verify SonarQube Running') {
+        steps {
+            echo "STEP 4: Checking SonarQube container..."
+            bat '''
+            docker ps | findstr sonarqube
+            if %errorlevel% neq 0 (
+                echo ERROR: SonarQube container not running!
+                exit /b 1
+            )
+            '''
+        }
+    }
+
     stage('SonarQube Code Scan') {
         steps {
-            echo "STEP 4: Running SonarQube Scan..."
+
+            echo "STEP 5: Running SonarQube Scan..."
+
             withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
 
                 bat """
                 docker run --rm ^
-                --add-host=host.docker.internal:host-gateway ^
+                -e SONAR_HOST_URL=%SONAR_HOST% ^
+                -e SONAR_LOGIN=%SONAR_TOKEN% ^
                 -v %WORKSPACE%:/usr/src ^
                 sonarsource/sonar-scanner-cli ^
                 -Dsonar.projectKey=devops-sonarqube-project ^
                 -Dsonar.sources=. ^
                 -Dsonar.host.url=%SONAR_HOST% ^
-                -Dsonar.login=%SONAR_TOKEN%
+                -Dsonar.login=%SONAR_TOKEN% ^
+                -Dsonar.javascript.node.maxspace=4096
                 """
+
             }
         }
     }
 
     stage('Build Docker Image') {
         steps {
-            echo "STEP 5: Building Docker Image..."
+            echo "STEP 6: Building Docker Image..."
             bat """
             docker build -t %DOCKER_IMAGE%:%DOCKER_TAG% .
             docker tag %DOCKER_IMAGE%:%DOCKER_TAG% %DOCKER_IMAGE%:latest
@@ -79,7 +97,7 @@ stages {
 
     stage('DockerHub Login') {
         steps {
-            echo "STEP 6: Logging into DockerHub..."
+            echo "STEP 7: Logging into DockerHub..."
             withCredentials([usernamePassword(
                 credentialsId: 'dockerhub-creds',
                 usernameVariable: 'DOCKER_USER',
@@ -89,13 +107,14 @@ stages {
                 bat """
                 echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
                 """
+
             }
         }
     }
 
-    stage('Push Docker Image to DockerHub') {
+    stage('Push Docker Image') {
         steps {
-            echo "STEP 7: Pushing Docker Image..."
+            echo "STEP 8: Pushing Docker Image..."
             bat """
             docker push %DOCKER_IMAGE%:%DOCKER_TAG%
             docker push %DOCKER_IMAGE%:latest
@@ -105,7 +124,7 @@ stages {
 
     stage('Terraform Init') {
         steps {
-            echo "STEP 8: Terraform Initialization..."
+            echo "STEP 9: Terraform Initialization..."
             bat """
             cd %TERRAFORM_DIR%
             terraform init
@@ -115,12 +134,12 @@ stages {
 
     stage('Terraform Apply (Deploy to Kubernetes)') {
         steps {
-            echo "STEP 9: Deploying to Kubernetes using Terraform..."
+            echo "STEP 10: Deploying to Kubernetes..."
 
             bat """
             cd %TERRAFORM_DIR%
 
-            REM Automatically use Docker Desktop Kubernetes config
+            REM Auto-use Docker Desktop Kubernetes config
             set KUBECONFIG=%USERPROFILE%\\.kube\\config
 
             terraform apply ^
@@ -132,7 +151,7 @@ stages {
 
     stage('Verify Kubernetes Deployment') {
         steps {
-            echo "STEP 10: Verifying Kubernetes Deployment..."
+            echo "STEP 11: Verifying Kubernetes Deployment..."
 
             bat """
             set KUBECONFIG=%USERPROFILE%\\.kube\\config
@@ -162,25 +181,26 @@ stages {
 
     stage('Verify Monitoring Stack') {
         steps {
-            echo "STEP 11: Verifying Monitoring Stack..."
+            echo "STEP 12: Verifying Monitoring Stack..."
+
             bat '''
             echo ================================
-            echo Checking SonarQube
+            echo SonarQube
             echo ================================
             docker ps | findstr sonarqube
 
             echo ================================
-            echo Checking Prometheus
+            echo Prometheus
             echo ================================
             docker ps | findstr prometheus
 
             echo ================================
-            echo Checking Grafana
+            echo Grafana
             echo ================================
             docker ps | findstr grafana
 
             echo ================================
-            echo Monitoring Verification Complete
+            echo Monitoring OK
             echo ================================
             '''
         }
@@ -191,17 +211,23 @@ stages {
 post {
 
     success {
-        echo "SUCCESS: CI/CD Pipeline executed successfully!"
+        echo "========================================"
+        echo "SUCCESS: CI/CD Pipeline executed!"
         echo "Docker Image: %DOCKER_IMAGE%:%DOCKER_TAG%"
         echo "Application URL: http://localhost:30007"
+        echo "SonarQube URL: http://localhost:9000"
+        echo "========================================"
     }
 
     failure {
-        echo "FAILED: Pipeline execution failed. Check logs."
+        echo "========================================"
+        echo "FAILED: Pipeline execution failed."
+        echo "Check Jenkins Console Output."
+        echo "========================================"
     }
 
     always {
-        echo "Pipeline execution finished."
+        echo "Pipeline finished."
     }
 
 }
