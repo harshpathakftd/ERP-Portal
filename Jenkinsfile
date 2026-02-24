@@ -9,20 +9,31 @@ options {
 
 environment {
 
-    // GitLab Repository
-    GIT_URL = "https://gitlab.com/SOFTAPP-TECHNOLOGIES/complete-industry-level-devops-ci-cd-pipeline-with-sonarqube.git"
-    GIT_BRANCH = "main"
-
-    // DockerHub Image
+    // DockerHub
     DOCKER_IMAGE = "shivsoftapp/monitering-django"
     IMAGE_TAG = "03"
 
-    // SonarQube URL (Docker Desktop container)
+    // SonarQube
     SONAR_HOST_URL = "http://localhost:9000"
 
 }
 
 stages {
+
+    stage('Initialize Variables') {
+        steps {
+            script {
+
+                // Define Git variables here
+                env.GIT_REPO_URL = "https://gitlab.com/SOFTAPP-TECHNOLOGIES/complete-industry-level-devops-ci-cd-pipeline-with-sonarqube.git"
+
+                env.GIT_REPO_BRANCH = "main"
+
+                echo "Repository URL: ${env.GIT_REPO_URL}"
+                echo "Branch: ${env.GIT_REPO_BRANCH}"
+            }
+        }
+    }
 
     stage('Clean Workspace') {
         steps {
@@ -30,30 +41,29 @@ stages {
         }
     }
 
-    stage('Checkout Code') {
+    stage('Checkout Source Code') {
         steps {
-            git branch: "%GIT_BRANCH%",
-                url: "%GIT_URL%"
+
+            git branch: "${env.GIT_REPO_BRANCH}",
+                url: "${env.GIT_REPO_URL}"
+
         }
     }
 
     stage('Verify Tools') {
         steps {
             bat '''
-            echo Checking Docker...
+            git --version
             docker version
-
-            echo Checking kubectl...
             kubectl version --client
-
-            echo Checking sonar-scanner...
             sonar-scanner.bat -v
             '''
         }
     }
 
-    stage('SonarQube Code Analysis') {
+    stage('SonarQube Analysis') {
         steps {
+
             withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
 
                 bat '''
@@ -65,19 +75,23 @@ stages {
                 '''
 
             }
+
         }
     }
 
     stage('Build Docker Image') {
         steps {
+
             bat '''
             docker build -t %DOCKER_IMAGE%:%IMAGE_TAG% .
             '''
+
         }
     }
 
     stage('Docker Login') {
         steps {
+
             withCredentials([usernamePassword(
                 credentialsId: 'dockerhub-creds',
                 usernameVariable: 'DOCKER_USER',
@@ -87,43 +101,45 @@ stages {
                 bat '''
                 docker login -u %DOCKER_USER% -p %DOCKER_PASS%
                 '''
+
             }
+
         }
     }
 
     stage('Push Docker Image') {
         steps {
+
             bat '''
             docker push %DOCKER_IMAGE%:%IMAGE_TAG%
             '''
+
         }
     }
 
-    stage('Deploy Application to Kubernetes') {
+    stage('Deploy to Kubernetes') {
         steps {
+
             bat '''
             kubectl apply -f k8s
-
             kubectl rollout restart deployment
-
             kubectl get pods
             '''
+
         }
     }
 
-    stage('Deploy Prometheus Monitoring') {
+    stage('Deploy Prometheus') {
         steps {
             script {
 
                 if (fileExists('monitoring/prometheus')) {
 
-                    bat '''
-                    kubectl apply -f monitoring/prometheus
-                    '''
+                    bat 'kubectl apply -f monitoring/prometheus'
 
                 } else {
 
-                    echo "Prometheus already running via Docker Desktop"
+                    echo "Prometheus already running"
 
                 }
 
@@ -131,19 +147,17 @@ stages {
         }
     }
 
-    stage('Deploy Grafana Monitoring') {
+    stage('Deploy Grafana') {
         steps {
             script {
 
                 if (fileExists('monitoring/grafana')) {
 
-                    bat '''
-                    kubectl apply -f monitoring/grafana
-                    '''
+                    bat 'kubectl apply -f monitoring/grafana'
 
                 } else {
 
-                    echo "Grafana already running via Docker Desktop"
+                    echo "Grafana already running"
 
                 }
 
@@ -153,10 +167,12 @@ stages {
 
     stage('Verify Deployment') {
         steps {
+
             bat '''
             kubectl get pods -A
             kubectl get svc -A
             '''
+
         }
     }
 
@@ -166,13 +182,13 @@ post {
 
     success {
 
-        echo "SUCCESS: CI/CD Pipeline completed successfully"
+        echo "PIPELINE SUCCESSFULLY COMPLETED"
 
     }
 
     failure {
 
-        echo "ERROR: Pipeline failed"
+        echo "PIPELINE FAILED"
 
     }
 
@@ -183,5 +199,6 @@ post {
     }
 
 }
+
 
 }
