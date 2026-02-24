@@ -37,7 +37,6 @@ pipeline {
             }
         }
 
-        // ✅ FIXED SONARQUBE STAGE
         stage('SonarQube Scan') {
             steps {
 
@@ -71,65 +70,70 @@ pipeline {
 
         stage('DockerHub Login') {
             steps {
+
                 echo "Logging into DockerHub..."
+
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub-creds',
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
+
                     bat """
                     echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
                     """
+
                 }
             }
         }
 
         stage('Push Docker Image') {
             steps {
+
                 echo "Pushing Docker Image..."
+
                 bat """
                 docker push %DOCKER_IMAGE%:%DOCKER_TAG%
                 """
+
             }
         }
 
-        stage('Terraform Init') {
+        stage('Terraform Init & Apply') {
             steps {
-                echo "Initializing Terraform..."
-                bat """
-                cd terraform
-                terraform init
-                """
-            }
-        }
 
-        stage('Terraform Apply') {
-            steps {
-                echo "Applying Terraform Infrastructure..."
-                bat """
-                cd terraform
-                terraform apply -auto-approve
-                """
-            }
-        }
+                echo "Deploying Infrastructure using Terraform..."
 
-        stage('Deploy to Kubernetes') {
-            steps {
-                echo "Deploying Application to Kubernetes..."
-                bat """
-                kubectl apply -f k8s/deployment.yaml
-                kubectl apply -f k8s/service.yaml
-                """
+                withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
+
+                    bat """
+                    cd terraform
+                    set KUBECONFIG=%KUBECONFIG_FILE%
+                    terraform init
+                    terraform apply -var="docker_image=%DOCKER_IMAGE%:%DOCKER_TAG%" -auto-approve
+                    """
+
+                }
+
             }
         }
 
         stage('Verify Kubernetes Deployment') {
             steps {
+
                 echo "Verifying Kubernetes Deployment..."
-                bat """
-                kubectl get pods
-                kubectl get services
-                """
+
+                withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
+
+                    bat """
+                    set KUBECONFIG=%KUBECONFIG_FILE%
+                    kubectl get namespaces
+                    kubectl get pods -n devops-sonarqube
+                    kubectl get services -n devops-sonarqube
+                    """
+
+                }
+
             }
         }
 
@@ -167,6 +171,7 @@ pipeline {
                 echo Monitoring Stack Verification SUCCESS
                 echo ===================================
                 '''
+
             }
         }
 
