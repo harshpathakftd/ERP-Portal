@@ -12,27 +12,32 @@ terraform {
 }
 
 provider "kubernetes" {
-
   config_path = "~/.kube/config"
-
 }
 
 # ============================
-# Create Namespace
+# Variable for Docker Image
+# ============================
+
+variable "docker_image" {
+  description = "Docker image with tag"
+  default     = "shivsoftapp/devops-sonarqube-image:33"
+}
+
+# ============================
+# Namespace
 # ============================
 
 resource "kubernetes_namespace" "devops_ns" {
 
   metadata {
-
     name = "devops-sonarqube"
-
   }
 
 }
 
 # ============================
-# Create Deployment
+# Deployment
 # ============================
 
 resource "kubernetes_deployment" "devops_app" {
@@ -43,9 +48,7 @@ resource "kubernetes_deployment" "devops_app" {
     namespace = kubernetes_namespace.devops_ns.metadata[0].name
 
     labels = {
-
       app = "devops-sonarqube"
-
     }
 
   }
@@ -55,38 +58,29 @@ resource "kubernetes_deployment" "devops_app" {
     replicas = 2
 
     selector {
-
       match_labels = {
-
         app = "devops-sonarqube"
-
       }
-
     }
 
     template {
 
       metadata {
-
         labels = {
-
           app = "devops-sonarqube"
-
         }
-
       }
 
       spec {
 
         container {
 
-          name  = "devops-container"
-          image = "shivsoftapp/devops-sonarqube-image:33"
+          name              = "devops-container"
+          image             = var.docker_image
+          image_pull_policy = "Always"
 
           port {
-
             container_port = 8000
-
           }
 
         }
@@ -100,7 +94,7 @@ resource "kubernetes_deployment" "devops_app" {
 }
 
 # ============================
-# Create Service
+# Service
 # ============================
 
 resource "kubernetes_service" "devops_service" {
@@ -115,9 +109,7 @@ resource "kubernetes_service" "devops_service" {
   spec {
 
     selector = {
-
       app = "devops-sonarqube"
-
     }
 
     port {
