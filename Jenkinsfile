@@ -9,7 +9,7 @@ options {
 
 environment {
 
-    // GitLab Repo
+    // GitLab Repository
     GIT_URL = "https://gitlab.com/SOFTAPP-TECHNOLOGIES/complete-industry-level-devops-ci-cd-pipeline-with-sonarqube.git"
     GIT_BRANCH = "main"
 
@@ -17,11 +17,8 @@ environment {
     DOCKER_IMAGE = "shivsoftapp/monitering-django"
     IMAGE_TAG = "03"
 
-    // Jenkins Credentials
-    DOCKER_CREDS = "dockerhub-creds"
-
-    // SonarQube running in Docker Desktop
-    SONAR_HOST = "http://localhost:9000"
+    // SonarQube URL (Docker Desktop container)
+    SONAR_HOST_URL = "http://localhost:9000"
 
 }
 
@@ -33,111 +30,133 @@ stages {
         }
     }
 
-    stage('Clone GitLab Repository') {
+    stage('Checkout Code') {
         steps {
-            git branch: "${GIT_BRANCH}",
-                url: "${GIT_URL}"
+            git branch: "%GIT_BRANCH%",
+                url: "%GIT_URL%"
         }
     }
 
-    stage('Verify Docker') {
+    stage('Verify Tools') {
         steps {
-            bat 'docker version'
+            bat '''
+            echo Checking Docker...
+            docker version
+
+            echo Checking kubectl...
+            kubectl version --client
+
+            echo Checking sonar-scanner...
+            sonar-scanner.bat -v
+            '''
         }
     }
 
-    stage('SonarQube Scan') {
+    stage('SonarQube Code Analysis') {
         steps {
-            bat """
-            sonar-scanner ^
-            -Dsonar.projectKey=monitoring-django ^
-            -Dsonar.sources=. ^
-            -Dsonar.host.url=%SONAR_HOST%
-            """
+            withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+
+                bat '''
+                sonar-scanner.bat ^
+                -Dsonar.projectKey=monitoring-django ^
+                -Dsonar.sources=. ^
+                -Dsonar.host.url=%SONAR_HOST_URL% ^
+                -Dsonar.login=%SONAR_TOKEN%
+                '''
+
+            }
         }
     }
 
     stage('Build Docker Image') {
         steps {
-            bat """
+            bat '''
             docker build -t %DOCKER_IMAGE%:%IMAGE_TAG% .
-            """
+            '''
         }
     }
 
     stage('Docker Login') {
         steps {
             withCredentials([usernamePassword(
-                credentialsId: "dockerhub-creds",
+                credentialsId: 'dockerhub-creds',
                 usernameVariable: 'DOCKER_USER',
                 passwordVariable: 'DOCKER_PASS'
             )]) {
 
-                bat """
+                bat '''
                 docker login -u %DOCKER_USER% -p %DOCKER_PASS%
-                """
+                '''
             }
         }
     }
 
     stage('Push Docker Image') {
         steps {
-            bat """
+            bat '''
             docker push %DOCKER_IMAGE%:%IMAGE_TAG%
-            """
+            '''
         }
     }
 
-    stage('Deploy to Kubernetes (Docker Desktop)') {
+    stage('Deploy Application to Kubernetes') {
         steps {
-            bat """
+            bat '''
             kubectl apply -f k8s
 
             kubectl rollout restart deployment
 
             kubectl get pods
-            """
+            '''
         }
     }
 
-    stage('Deploy Prometheus (if exists)') {
+    stage('Deploy Prometheus Monitoring') {
         steps {
             script {
+
                 if (fileExists('monitoring/prometheus')) {
 
-                    bat """
+                    bat '''
                     kubectl apply -f monitoring/prometheus
-                    """
+                    '''
 
                 } else {
-                    echo "Prometheus already running in Docker Desktop"
+
+                    echo "Prometheus already running via Docker Desktop"
+
                 }
+
             }
         }
     }
 
-    stage('Deploy Grafana (if exists)') {
+    stage('Deploy Grafana Monitoring') {
         steps {
             script {
+
                 if (fileExists('monitoring/grafana')) {
 
-                    bat """
+                    bat '''
                     kubectl apply -f monitoring/grafana
-                    """
+                    '''
 
                 } else {
-                    echo "Grafana already running in Docker Desktop"
+
+                    echo "Grafana already running via Docker Desktop"
+
                 }
+
             }
         }
     }
 
     stage('Verify Deployment') {
         steps {
-            bat """
+            bat '''
             kubectl get pods -A
             kubectl get svc -A
-            """
+            '''
         }
     }
 
@@ -147,7 +166,7 @@ post {
 
     success {
 
-        echo "SUCCESS: Application deployed successfully"
+        echo "SUCCESS: CI/CD Pipeline completed successfully"
 
     }
 
