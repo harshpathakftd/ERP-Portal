@@ -8,9 +8,9 @@ spec:
   type: NodePort
 
   selector:
-    app: devops-sonarqube-app
+    app: devops-sonarqube
 
   ports:
-  - port: 5000
-    targetPort: 5000
+  - port: 8000
+    targetPort: 8000
     nodePort: 30007
