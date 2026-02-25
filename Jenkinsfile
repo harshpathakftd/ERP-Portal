@@ -10,7 +10,6 @@ buildDiscarder(logRotator(numToKeepStr: '10'))
 
 environment {
 
-```
 APP_NAME = "erp-project"
 
 DOCKER_IMAGE = "shivsoftapp/sonar-erp"
@@ -30,13 +29,12 @@ KUBECONFIG = "C:\\Users\\rahul\\.kube\\config"
 PROMETHEUS_URL = "http://localhost:9090"
 
 GRAFANA_URL = "http://localhost:3000"
-```
+
 
 }
 
 stages {
 
-```
 stage('Checkout Source Code') {
     steps {
         echo "Checking out source code..."
@@ -164,13 +162,12 @@ stage('Grafana Monitoring Check') {
         bat "curl %GRAFANA_URL%"
     }
 }
-```
+
 
 }
 
 post {
 
-```
 success {
 
     echo "======================================"
@@ -201,7 +198,6 @@ failure {
 always {
     cleanWs()
 }
-```
 
 }
 
