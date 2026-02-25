@@ -16,7 +16,7 @@ environment {
     // DockerHub
     DOCKER_IMAGE = "shivsoftapp/sonar-erp"
     IMAGE_TAG = "033"
-    DOCKERHUB_CREDS = credentials('dockerhub-cred')
+    DOCKERHUB_CREDS = credentials('dockerhub-creds')
 
     // SonarQube (Docker container)
     SONAR_HOST = "http://host.docker.internal:9000"
