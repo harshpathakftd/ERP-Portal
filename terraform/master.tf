@@ -12,12 +12,11 @@ required_version = ">= 1.0"
 
 required_providers {
 
-```
 kubernetes = {
   source  = "hashicorp/kubernetes"
   version = "~> 2.23"
 }
-```
+
 
 }
 
@@ -66,7 +65,6 @@ app = "erp-app"
 
 spec {
 
-```
 replicas = 2
 
 selector {
@@ -100,7 +98,6 @@ template {
   }
 
 }
-```
 
 }
 
@@ -120,7 +117,6 @@ name = "erp-service"
 
 spec {
 
-```
 selector = {
   app = "erp-app"
 }
@@ -132,7 +128,6 @@ port {
 }
 
 type = "NodePort"
-```
 
 }
 
