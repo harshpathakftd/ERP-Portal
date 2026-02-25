@@ -2,7 +2,7 @@
 
 # Terraform Kubernetes Deployment File
 
-# Jenkins Compatible
+# Windows + Jenkins Compatible
 
 ########################################
 
@@ -11,13 +11,10 @@ terraform {
 required_version = ">= 1.0"
 
 required_providers {
-
 kubernetes = {
-  source  = "hashicorp/kubernetes"
-  version = "~> 2.23"
+source  = "hashicorp/kubernetes"
+version = "~> 2.23"
 }
-
-
 }
 
 }
@@ -38,7 +35,7 @@ type = string
 
 ########################################
 
-# Kubernetes Provider
+# Kubernetes Provider (Windows Path)
 
 ########################################
 
@@ -50,7 +47,7 @@ config_path = "C:/Users/rahul/.kube/config"
 
 ########################################
 
-# Deployment
+# Kubernetes Deployment
 
 ########################################
 
@@ -58,12 +55,16 @@ resource "kubernetes_deployment" "erp" {
 
 metadata {
 name = "erp-deployment"
+
 labels = {
-app = "erp-app"
+  app = "erp-app"
 }
+
+
 }
 
 spec {
+
 
 replicas = 2
 
@@ -89,6 +90,8 @@ template {
 
       image = "${var.docker_image}:${var.image_tag}"
 
+      image_pull_policy = "Always"
+
       port {
         container_port = 8000
       }
@@ -99,13 +102,14 @@ template {
 
 }
 
+
 }
 
 }
 
 ########################################
 
-# Service
+# Kubernetes Service
 
 ########################################
 
@@ -117,8 +121,9 @@ name = "erp-service"
 
 spec {
 
+
 selector = {
-  app = "erp-app"
+  app = kubernetes_deployment.erp.metadata[0].labels.app
 }
 
 port {
@@ -128,6 +133,7 @@ port {
 }
 
 type = "NodePort"
+
 
 }
 
