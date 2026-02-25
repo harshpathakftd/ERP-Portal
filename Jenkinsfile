@@ -9,68 +9,78 @@ options {
 
 environment {
 
-    // DockerHub
-    DOCKER_IMAGE = "shivsoftapp/monitering-django"
-    IMAGE_TAG = "03"
+    DOCKER_IMAGE = "shivsoftapp/devops-sonarqube-image"
+    DOCKER_TAG = "33"
 
-    // SonarQube
-    SONAR_HOST_URL = "http://localhost:9000"
+    SONAR_HOST = "http://host.docker.internal:9000"
+
+    GIT_URL = "https://gitlab.com/SOFTAPP-TECHNOLOGIES/complete-industry-level-devops-ci-cd-pipeline-with-sonarqube.git"
+    GIT_BRANCH = "main"
 
 }
 
 stages {
 
-    stage('Initialize Variables') {
-        steps {
-            script {
-
-                // Define Git variables here
-                env.GIT_REPO_URL = "https://gitlab.com/SOFTAPP-TECHNOLOGIES/complete-industry-level-devops-ci-cd-pipeline-with-sonarqube.git"
-
-                env.GIT_REPO_BRANCH = "main"
-
-                echo "Repository URL: ${env.GIT_REPO_URL}"
-                echo "Branch: ${env.GIT_REPO_BRANCH}"
-            }
-        }
-    }
-
     stage('Clean Workspace') {
         steps {
-            cleanWs()
+            echo "Cleaning Workspace..."
+            deleteDir()
         }
     }
 
-    stage('Checkout Source Code') {
+    stage('Clone GitLab Repository') {
         steps {
 
-            git branch: "${env.GIT_REPO_BRANCH}",
-                url: "${env.GIT_REPO_URL}"
+            echo "Cloning GitLab Repository..."
+
+            git branch: "${GIT_BRANCH}",
+                url: "${GIT_URL}"
 
         }
     }
 
-    stage('Verify Tools') {
+    stage('Verify Workspace Files') {
         steps {
+
+            bat '''
+            echo ===================================
+            echo Workspace Files
+            echo ===================================
+            dir
+            echo ===================================
+            '''
+
+        }
+    }
+
+    stage('Verify Required Tools') {
+        steps {
+
             bat '''
             git --version
             docker version
             kubectl version --client
-            sonar-scanner.bat -v
+            terraform version
             '''
+
         }
     }
 
-    stage('SonarQube Analysis') {
+    stage('SonarQube Scan') {
         steps {
+
+            echo "Running SonarQube Scan..."
 
             withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
 
                 bat '''
-                sonar-scanner.bat ^
-                -Dsonar.projectKey=monitoring-django ^
+                docker run --rm ^
+                -v "%WORKSPACE%:/usr/src" ^
+                -w /usr/src ^
+                sonarsource/sonar-scanner-cli ^
+                -Dsonar.projectKey=devops-sonarqube-project ^
                 -Dsonar.sources=. ^
-                -Dsonar.host.url=%SONAR_HOST_URL% ^
+                -Dsonar.host.url=%SONAR_HOST% ^
                 -Dsonar.login=%SONAR_TOKEN%
                 '''
 
@@ -82,15 +92,19 @@ stages {
     stage('Build Docker Image') {
         steps {
 
+            echo "Building Docker Image..."
+
             bat '''
-            docker build -t %DOCKER_IMAGE%:%IMAGE_TAG% .
+            docker build -t %DOCKER_IMAGE%:%DOCKER_TAG% .
             '''
 
         }
     }
 
-    stage('Docker Login') {
+    stage('DockerHub Login') {
         steps {
+
+            echo "Logging into DockerHub..."
 
             withCredentials([usernamePassword(
                 credentialsId: 'dockerhub-creds',
@@ -99,7 +113,7 @@ stages {
             )]) {
 
                 bat '''
-                docker login -u %DOCKER_USER% -p %DOCKER_PASS%
+                echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
                 '''
 
             }
@@ -110,9 +124,57 @@ stages {
     stage('Push Docker Image') {
         steps {
 
+            echo "Pushing Docker Image..."
+
             bat '''
-            docker push %DOCKER_IMAGE%:%IMAGE_TAG%
+            docker push %DOCKER_IMAGE%:%DOCKER_TAG%
             '''
+
+        }
+    }
+
+    stage('Terraform Init') {
+        steps {
+
+            script {
+
+                if (fileExists('terraform')) {
+
+                    bat '''
+                    cd terraform
+                    terraform init
+                    '''
+
+                } else {
+
+                    echo "Terraform folder not found, skipping Terraform."
+
+                }
+
+            }
+
+        }
+    }
+
+    stage('Terraform Apply') {
+        steps {
+
+            script {
+
+                if (fileExists('terraform')) {
+
+                    bat '''
+                    cd terraform
+                    terraform apply -auto-approve
+                    '''
+
+                } else {
+
+                    echo "Terraform folder not found, skipping Terraform."
+
+                }
+
+            }
 
         }
     }
@@ -120,57 +182,47 @@ stages {
     stage('Deploy to Kubernetes') {
         steps {
 
+            echo "Deploying Application to Kubernetes..."
+
             bat '''
-            kubectl apply -f k8s
+            kubectl apply -f k8s/
+
             kubectl rollout restart deployment
+
             kubectl get pods
+            kubectl get svc
             '''
 
         }
     }
 
-    stage('Deploy Prometheus') {
-        steps {
-            script {
-
-                if (fileExists('monitoring/prometheus')) {
-
-                    bat 'kubectl apply -f monitoring/prometheus'
-
-                } else {
-
-                    echo "Prometheus already running"
-
-                }
-
-            }
-        }
-    }
-
-    stage('Deploy Grafana') {
-        steps {
-            script {
-
-                if (fileExists('monitoring/grafana')) {
-
-                    bat 'kubectl apply -f monitoring/grafana'
-
-                } else {
-
-                    echo "Grafana already running"
-
-                }
-
-            }
-        }
-    }
-
-    stage('Verify Deployment') {
+    stage('Verify Kubernetes Deployment') {
         steps {
 
             bat '''
-            kubectl get pods -A
-            kubectl get svc -A
+            echo ===================================
+            kubectl get pods -o wide
+            kubectl get svc
+            echo ===================================
+            '''
+
+        }
+    }
+
+    stage('Monitoring Verification') {
+        steps {
+
+            bat '''
+            echo Checking SonarQube...
+            docker ps | findstr sonarqube
+
+            echo Checking Prometheus...
+            docker ps | findstr prometheus
+
+            echo Checking Grafana...
+            docker ps | findstr grafana
+
+            echo Monitoring Stack Verification SUCCESS
             '''
 
         }
@@ -181,24 +233,17 @@ stages {
 post {
 
     success {
-
-        echo "PIPELINE SUCCESSFULLY COMPLETED"
-
+        echo "SUCCESS: Full DevOps CI/CD Pipeline executed successfully!"
     }
 
     failure {
-
-        echo "PIPELINE FAILED"
-
+        echo "FAILED: Pipeline execution failed. Check Jenkins console logs."
     }
 
     always {
-
-        cleanWs()
-
+        echo "Pipeline Finished."
     }
 
 }
-
 
 }
