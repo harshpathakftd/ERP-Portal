@@ -1,5 +1,6 @@
 pipeline {
 
+```
 agent any
 
 options {
@@ -28,7 +29,7 @@ stages {
         }
     }
 
-    stage('Clone GitLab Repository') {
+    stage('Clone Repository') {
         steps {
 
             echo "Cloning GitLab Repository..."
@@ -39,21 +40,19 @@ stages {
         }
     }
 
-    stage('Verify Workspace Files') {
+    stage('Verify Workspace') {
         steps {
 
             bat '''
-            echo ===================================
-            echo Workspace Files
-            echo ===================================
+            echo ===== WORKSPACE FILES =====
             dir
-            echo ===================================
+            echo ===========================
             '''
 
         }
     }
 
-    stage('Verify Required Tools') {
+    stage('Verify Tools') {
         steps {
 
             bat '''
@@ -80,6 +79,7 @@ stages {
                 sonarsource/sonar-scanner-cli ^
                 -Dsonar.projectKey=devops-sonarqube-project ^
                 -Dsonar.sources=. ^
+                -Dsonar.exclusions=terraform/** ^
                 -Dsonar.host.url=%SONAR_HOST% ^
                 -Dsonar.login=%SONAR_TOKEN%
                 '''
@@ -92,8 +92,6 @@ stages {
     stage('Build Docker Image') {
         steps {
 
-            echo "Building Docker Image..."
-
             bat '''
             docker build -t %DOCKER_IMAGE%:%DOCKER_TAG% .
             '''
@@ -103,8 +101,6 @@ stages {
 
     stage('DockerHub Login') {
         steps {
-
-            echo "Logging into DockerHub..."
 
             withCredentials([usernamePassword(
                 credentialsId: 'dockerhub-creds',
@@ -124,8 +120,6 @@ stages {
     stage('Push Docker Image') {
         steps {
 
-            echo "Pushing Docker Image..."
-
             bat '''
             docker push %DOCKER_IMAGE%:%DOCKER_TAG%
             '''
@@ -138,7 +132,7 @@ stages {
 
             script {
 
-                if (fileExists('terraform')) {
+                if (fileExists('terraform/main.tf')) {
 
                     bat '''
                     cd terraform
@@ -147,7 +141,7 @@ stages {
 
                 } else {
 
-                    echo "Terraform folder not found, skipping Terraform."
+                    echo "Terraform file not found, skipping..."
 
                 }
 
@@ -161,7 +155,7 @@ stages {
 
             script {
 
-                if (fileExists('terraform')) {
+                if (fileExists('terraform/main.tf')) {
 
                     bat '''
                     cd terraform
@@ -170,7 +164,7 @@ stages {
 
                 } else {
 
-                    echo "Terraform folder not found, skipping Terraform."
+                    echo "Terraform file not found, skipping..."
 
                 }
 
@@ -182,8 +176,6 @@ stages {
     stage('Deploy to Kubernetes') {
         steps {
 
-            echo "Deploying Application to Kubernetes..."
-
             bat '''
             kubectl apply -f k8s/
 
@@ -191,19 +183,6 @@ stages {
 
             kubectl get pods
             kubectl get svc
-            '''
-
-        }
-    }
-
-    stage('Verify Kubernetes Deployment') {
-        steps {
-
-            bat '''
-            echo ===================================
-            kubectl get pods -o wide
-            kubectl get svc
-            echo ===================================
             '''
 
         }
@@ -221,8 +200,6 @@ stages {
 
             echo Checking Grafana...
             docker ps | findstr grafana
-
-            echo Monitoring Stack Verification SUCCESS
             '''
 
         }
@@ -233,15 +210,11 @@ stages {
 post {
 
     success {
-        echo "SUCCESS: Full DevOps CI/CD Pipeline executed successfully!"
+        echo "SUCCESS: CI/CD Pipeline completed successfully"
     }
 
     failure {
-        echo "FAILED: Pipeline execution failed. Check Jenkins console logs."
-    }
-
-    always {
-        echo "Pipeline Finished."
+        echo "FAILED: Pipeline failed"
     }
 
 }
