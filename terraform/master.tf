@@ -35,7 +35,7 @@ type = string
 
 ########################################
 
-# Kubernetes Provider (Windows Path)
+# Kubernetes Provider (Windows)
 
 ########################################
 
@@ -47,7 +47,7 @@ config_path = "C:/Users/rahul/.kube/config"
 
 ########################################
 
-# Kubernetes Deployment
+# Deployment
 
 ########################################
 
@@ -60,11 +60,9 @@ labels = {
   app = "erp-app"
 }
 
-
 }
 
 spec {
-
 
 replicas = 2
 
@@ -109,7 +107,7 @@ template {
 
 ########################################
 
-# Kubernetes Service
+# Service
 
 ########################################
 
@@ -121,9 +119,8 @@ name = "erp-service"
 
 spec {
 
-
 selector = {
-  app = kubernetes_deployment.erp.metadata[0].labels.app
+  app = "erp-app"
 }
 
 port {
@@ -133,7 +130,6 @@ port {
 }
 
 type = "NodePort"
-
 
 }
 
