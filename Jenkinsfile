@@ -12,7 +12,7 @@ environment {
 
     APP_NAME = "erp-project"
 
-    // Dynamic Docker tag
+    // Dynamic image tag from Jenkins build number
     IMAGE_TAG = "${BUILD_NUMBER}"
 
     DOCKER_IMAGE = "shivsoftapp/sonar-erp"
@@ -22,8 +22,6 @@ environment {
     SONAR_HOST = "http://host.docker.internal:9000"
 
     SONAR_TOKEN = credentials('sonar-token')
-
-    KUBECONFIG = "C:\\Users\\rahul\\.kube\\config"
 
     TERRAFORM_DIR = "terraform"
 
@@ -42,7 +40,9 @@ stages {
 
             git branch: 'main',
             url: 'https://gitlab.com/SOFTAPP-TECHNOLOGIES/complete-industry-level-devops-ci-cd-pipeline-with-sonarqube.git'
+
         }
+
     }
 
     stage('Install Dependencies') {
@@ -58,19 +58,19 @@ stages {
             python:3.11 ^
             pip install -r erp.txt
             """
+
         }
+
     }
 
     stage('SonarQube Analysis') {
 
         steps {
 
-            echo "Running SonarQube scan..."
+            echo "Running SonarQube analysis..."
 
             bat """
             docker run --rm ^
-            -e SONAR_HOST_URL=%SONAR_HOST% ^
-            -e SONAR_LOGIN=%SONAR_TOKEN% ^
             -v "%WORKSPACE%:/usr/src" ^
             sonarsource/sonar-scanner-cli ^
             -Dsonar.projectKey=%APP_NAME% ^
@@ -78,7 +78,9 @@ stages {
             -Dsonar.host.url=%SONAR_HOST% ^
             -Dsonar.login=%SONAR_TOKEN%
             """
+
         }
+
     }
 
     stage('Quality Gate Check') {
@@ -93,7 +95,11 @@ stages {
 
                     if (qualityGate.status != 'OK') {
 
-                        error "SonarQube Quality Gate Failed: ${qualityGate.status}"
+                        error "Quality Gate Failed: ${qualityGate.status}"
+
+                    } else {
+
+                        echo "Quality Gate PASSED"
 
                     }
 
@@ -109,7 +115,7 @@ stages {
 
         steps {
 
-            echo "Validating Django project..."
+            echo "Running Django validation..."
 
             bat """
             docker run --rm ^
@@ -118,7 +124,9 @@ stages {
             python:3.11 ^
             python manage.py check
             """
+
         }
+
     }
 
     stage('Build Docker Image') {
@@ -165,7 +173,7 @@ stages {
 
         steps {
 
-            echo "Terraform initialization..."
+            echo "Terraform Init..."
 
             dir("${TERRAFORM_DIR}") {
 
@@ -181,7 +189,7 @@ stages {
 
         steps {
 
-            echo "Terraform validation..."
+            echo "Terraform Validate..."
 
             dir("${TERRAFORM_DIR}") {
 
@@ -197,11 +205,16 @@ stages {
 
         steps {
 
-            echo "Terraform plan..."
+            echo "Terraform Plan with dynamic image..."
 
             dir("${TERRAFORM_DIR}") {
 
-                bat "terraform plan -out=tfplan"
+                bat """
+                terraform plan ^
+                -var="docker_image=%DOCKER_IMAGE%" ^
+                -var="image_tag=%IMAGE_TAG%" ^
+                -out=tfplan
+                """
 
             }
 
@@ -213,11 +226,15 @@ stages {
 
         steps {
 
-            echo "Terraform apply..."
+            echo "Terraform Apply..."
 
             dir("${TERRAFORM_DIR}") {
 
-                bat "terraform apply -auto-approve tfplan"
+                bat """
+                terraform apply ^
+                -auto-approve ^
+                tfplan
+                """
 
             }
 
@@ -225,48 +242,21 @@ stages {
 
     }
 
-    stage('Deploy to Kubernetes') {
+    stage('Verify Kubernetes Deployment') {
 
         steps {
 
-            echo "Deploying to Kubernetes..."
+            echo "Verifying Kubernetes deployment..."
 
-            bat """
-            kubectl --kubeconfig=%KUBECONFIG% apply -f k8s\\deployment.yaml
-            kubectl --kubeconfig=%KUBECONFIG% apply -f k8s\\service.yaml
-            """
+            bat "kubectl get pods"
+
+            bat "kubectl get svc"
 
         }
 
     }
 
-    stage('Verify Deployment') {
-
-        steps {
-
-            echo "Verifying deployment..."
-
-            bat "kubectl --kubeconfig=%KUBECONFIG% get pods"
-
-            bat "kubectl --kubeconfig=%KUBECONFIG% get svc"
-
-        }
-
-    }
-
-    stage('Rollout Status') {
-
-        steps {
-
-            echo "Checking rollout status..."
-
-            bat "kubectl --kubeconfig=%KUBECONFIG% rollout status deployment/erp-deployment"
-
-        }
-
-    }
-
-    stage('Monitoring Check') {
+    stage('Monitoring Verification') {
 
         steps {
 
@@ -288,19 +278,24 @@ post {
 
     success {
 
-        echo "======================================"
+        echo "========================================"
+        echo "CI/CD PIPELINE EXECUTED SUCCESSFULLY"
+        echo "========================================"
 
-        echo "CI/CD PIPELINE COMPLETED SUCCESSFULLY"
+        echo "Docker Image:"
+        echo "%DOCKER_IMAGE%:%IMAGE_TAG%"
 
-        echo "======================================"
+        echo "SonarQube:"
+        echo "http://localhost:9000"
 
-        echo "Docker Image: %DOCKER_IMAGE%:%IMAGE_TAG%"
+        echo "Prometheus:"
+        echo "http://localhost:9090"
 
-        echo "SonarQube: http://localhost:9000"
+        echo "Grafana:"
+        echo "http://localhost:3000"
 
-        echo "Prometheus: http://localhost:9090"
-
-        echo "Grafana: http://localhost:3000"
+        echo "Application URL:"
+        echo "http://localhost:30007"
 
     }
 
