@@ -5,38 +5,33 @@ agent any
 options {
     timestamps()
     disableConcurrentBuilds()
-    buildDiscarder(logRotator(numToKeepStr: '10'))
 }
 
 environment {
 
     APP_NAME = "erp-project"
 
-    // Dynamic image tag from Jenkins build number
     IMAGE_TAG = "${BUILD_NUMBER}"
 
     DOCKER_IMAGE = "shivsoftapp/sonar-erp"
 
     DOCKERHUB_CREDS = credentials('dockerhub-creds')
 
-    SONAR_HOST = "http://host.docker.internal:9000"
-
-    SONAR_TOKEN = credentials('sonar-token')
+    SONARQUBE_SERVER = "SonarQube"
 
     TERRAFORM_DIR = "terraform"
 
     PROMETHEUS_URL = "http://localhost:9090"
 
     GRAFANA_URL = "http://localhost:3000"
+
 }
 
 stages {
 
-    stage('Checkout Code') {
+    stage('Checkout') {
 
         steps {
-
-            echo "Cloning source code..."
 
             git branch: 'main',
             url: 'https://gitlab.com/SOFTAPP-TECHNOLOGIES/complete-industry-level-devops-ci-cd-pipeline-with-sonarqube.git'
@@ -48,8 +43,6 @@ stages {
     stage('Install Dependencies') {
 
         steps {
-
-            echo "Installing Python dependencies..."
 
             bat """
             docker run --rm ^
@@ -67,43 +60,13 @@ stages {
 
         steps {
 
-            echo "Running SonarQube analysis..."
+            withSonarQubeEnv("${SONARQUBE_SERVER}") {
 
-            bat """
-            docker run --rm ^
-            -v "%WORKSPACE%:/usr/src" ^
-            sonarsource/sonar-scanner-cli ^
-            -Dsonar.projectKey=%APP_NAME% ^
-            -Dsonar.sources=. ^
-            -Dsonar.host.url=%SONAR_HOST% ^
-            -Dsonar.login=%SONAR_TOKEN%
-            """
-
-        }
-
-    }
-
-    stage('Quality Gate Check') {
-
-        steps {
-
-            script {
-
-                timeout(time: 10, unit: 'MINUTES') {
-
-                    def qualityGate = waitForQualityGate()
-
-                    if (qualityGate.status != 'OK') {
-
-                        error "Quality Gate Failed: ${qualityGate.status}"
-
-                    } else {
-
-                        echo "Quality Gate PASSED"
-
-                    }
-
-                }
+                bat """
+                sonar-scanner ^
+                -Dsonar.projectKey=%APP_NAME% ^
+                -Dsonar.sources=. ^
+                """
 
             }
 
@@ -111,19 +74,15 @@ stages {
 
     }
 
-    stage('Django Validation') {
+    stage('Quality Gate') {
 
         steps {
 
-            echo "Running Django validation..."
+            timeout(time: 10, unit: 'MINUTES') {
 
-            bat """
-            docker run --rm ^
-            -v "%WORKSPACE%:/app" ^
-            -w /app ^
-            python:3.11 ^
-            python manage.py check
-            """
+                waitForQualityGate abortPipeline: true
+
+            }
 
         }
 
@@ -133,19 +92,15 @@ stages {
 
         steps {
 
-            echo "Building Docker image..."
-
             bat "docker build -t %DOCKER_IMAGE%:%IMAGE_TAG% ."
 
         }
 
     }
 
-    stage('DockerHub Login') {
+    stage('Docker Login') {
 
         steps {
-
-            echo "Logging into DockerHub..."
 
             bat """
             docker login ^
@@ -161,53 +116,19 @@ stages {
 
         steps {
 
-            echo "Pushing Docker image..."
-
             bat "docker push %DOCKER_IMAGE%:%IMAGE_TAG%"
 
         }
 
     }
 
-    stage('Terraform Init') {
+    stage('Terraform Deploy') {
 
         steps {
-
-            echo "Terraform Init..."
 
             dir("${TERRAFORM_DIR}") {
 
                 bat "terraform init"
-
-            }
-
-        }
-
-    }
-
-    stage('Terraform Validate') {
-
-        steps {
-
-            echo "Terraform Validate..."
-
-            dir("${TERRAFORM_DIR}") {
-
-                bat "terraform validate"
-
-            }
-
-        }
-
-    }
-
-    stage('Terraform Plan') {
-
-        steps {
-
-            echo "Terraform Plan with dynamic image..."
-
-            dir("${TERRAFORM_DIR}") {
 
                 bat """
                 terraform plan ^
@@ -216,25 +137,7 @@ stages {
                 -out=tfplan
                 """
 
-            }
-
-        }
-
-    }
-
-    stage('Terraform Apply') {
-
-        steps {
-
-            echo "Terraform Apply..."
-
-            dir("${TERRAFORM_DIR}") {
-
-                bat """
-                terraform apply ^
-                -auto-approve ^
-                tfplan
-                """
+                bat "terraform apply -auto-approve tfplan"
 
             }
 
@@ -242,11 +145,9 @@ stages {
 
     }
 
-    stage('Verify Kubernetes Deployment') {
+    stage('Verify Deployment') {
 
         steps {
-
-            echo "Verifying Kubernetes deployment..."
 
             bat "kubectl get pods"
 
@@ -256,15 +157,11 @@ stages {
 
     }
 
-    stage('Monitoring Verification') {
+    stage('Monitoring Check') {
 
         steps {
 
-            echo "Checking Prometheus..."
-
             bat "curl %PROMETHEUS_URL%"
-
-            echo "Checking Grafana..."
 
             bat "curl %GRAFANA_URL%"
 
@@ -278,40 +175,24 @@ post {
 
     success {
 
-        echo "========================================"
-        echo "CI/CD PIPELINE EXECUTED SUCCESSFULLY"
-        echo "========================================"
+        echo "================================="
+        echo "PIPELINE SUCCESSFULLY COMPLETED"
+        echo "================================="
 
-        echo "Docker Image:"
-        echo "%DOCKER_IMAGE%:%IMAGE_TAG%"
+        echo "Docker Image: %DOCKER_IMAGE%:%IMAGE_TAG%"
 
-        echo "SonarQube:"
-        echo "http://localhost:9000"
+        echo "SonarQube: http://localhost:9000"
 
-        echo "Prometheus:"
-        echo "http://localhost:9090"
-
-        echo "Grafana:"
-        echo "http://localhost:3000"
-
-        echo "Application URL:"
-        echo "http://localhost:30007"
+        echo "Application: http://localhost:30007"
 
     }
 
     failure {
 
-        echo "PIPELINE FAILED - CHECK LOGS"
-
-    }
-
-    always {
-
-        cleanWs()
+        echo "PIPELINE FAILED"
 
     }
 
 }
-
 
 }
