@@ -2,32 +2,67 @@ apiVersion: apps/v1
 kind: Deployment
 
 metadata:
-  name: devops-sonarqube-app
-  labels:
-    app: devops-sonarqube
+name: erp-deployment
+labels:
+app: erp-app
 
 spec:
-  replicas: 2
+replicas: 2
 
-  selector:
-    matchLabels:
-      app: devops-sonarqube
+strategy:
+type: RollingUpdate
+rollingUpdate:
+maxUnavailable: 1
+maxSurge: 1
 
-  template:
+selector:
+matchLabels:
+app: erp-app
 
-    metadata:
-      labels:
-        app: devops-sonarqube
+template:
 
-    spec:
 
-      containers:
+metadata:
+  labels:
+    app: erp-app
 
-      - name: devops-container
+spec:
 
-        image: shivsoftapp/devops-sonarqube-image:33
+  containers:
 
-        imagePullPolicy: Always
+  - name: erp-container
 
-        ports:
-        - containerPort: 8000
+    # Jenkins will dynamically update this image tag
+    image: shivsoftapp/sonar-erp:latest
+
+    imagePullPolicy: Always
+
+    ports:
+    - containerPort: 8000
+
+    # Resource limits (important for production)
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+
+    # Health check
+    livenessProbe:
+      httpGet:
+        path: /
+        port: 8000
+      initialDelaySeconds: 30
+      periodSeconds: 10
+
+    readinessProbe:
+      httpGet:
+        path: /
+        port: 8000
+      initialDelaySeconds: 15
+      periodSeconds: 5
+
+  restartPolicy: Always
+
