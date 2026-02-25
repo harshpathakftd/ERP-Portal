@@ -5,203 +5,218 @@ agent any
 options {
     timestamps()
     disableConcurrentBuilds()
+    buildDiscarder(logRotator(numToKeepStr: '10'))
 }
 
 environment {
 
-    DOCKER_IMAGE = "shivsoftapp/devops-sonarqube-image"
-    DOCKER_TAG = "33"
+    // Application
+    APP_NAME = "erp-project"
 
+    // DockerHub
+    DOCKER_IMAGE = "shivsoftapp/sonar-erp"
+    IMAGE_TAG = "033"
+    DOCKERHUB_CREDS = credentials('dockerhub-cred')
+
+    // SonarQube (Docker container)
     SONAR_HOST = "http://host.docker.internal:9000"
+    SONAR_TOKEN = credentials('sonar-token')
 
-    GIT_URL = "https://gitlab.com/SOFTAPP-TECHNOLOGIES/complete-industry-level-devops-ci-cd-pipeline-with-sonarqube.git"
-    GIT_BRANCH = "main"
+    // Kubernetes (Docker Desktop)
+    KUBECONFIG = "C:\\Users\\rahul\\.kube\\config"
+
+    // Monitoring tools (already running containers)
+    PROMETHEUS_URL = "http://localhost:9090"
+    GRAFANA_URL = "http://localhost:3000"
 
 }
 
 stages {
 
-    stage('Clean Workspace') {
-        steps {
-            echo "Cleaning Workspace..."
-            deleteDir()
-        }
-    }
+    stage('Checkout Code') {
 
-    stage('Clone Repository') {
         steps {
 
-            echo "Cloning GitLab Repository..."
+            echo "Cloning source code from Git..."
 
-            git branch: "${GIT_BRANCH}",
-                url: "${GIT_URL}"
+            git branch: 'main',
+            url: 'https://gitlab.com/SOFTAPP-TECHNOLOGIES/complete-industry-level-devops-ci-cd-pipeline-with-sonarqube.git'
 
         }
+
     }
 
-    stage('Verify Workspace') {
+    stage('Install Python Dependencies') {
+
         steps {
 
-            bat '''
-            echo ===== WORKSPACE FILES =====
-            dir
-            echo ===========================
-            '''
+            echo "Installing dependencies..."
+
+            bat """
+            python -m pip install --upgrade pip
+            pip install -r erp.txt
+            """
 
         }
+
     }
 
-    stage('Verify Tools') {
+    stage('SonarQube Analysis (Docker Scanner)') {
+
         steps {
 
-            bat '''
-            git --version
-            docker version
-            kubectl version --client
-            terraform version
-            '''
+            echo "Running SonarQube analysis..."
+
+            bat """
+            docker run --rm ^
+            -v "%WORKSPACE%:/usr/src" ^
+            -w /usr/src ^
+            sonarsource/sonar-scanner-cli:latest ^
+            -Dsonar.projectKey=erp-project ^
+            -Dsonar.projectName=erp-project ^
+            -Dsonar.sources=. ^
+            -Dsonar.python.version=3 ^
+            -Dsonar.host.url=%SONAR_HOST% ^
+            -Dsonar.login=%SONAR_TOKEN%
+            """
 
         }
+
     }
 
-    stage('SonarQube Scan') {
+    stage('Quality Gate Check') {
+
         steps {
 
-            echo "Running SonarQube Scan..."
+            timeout(time: 15, unit: 'MINUTES') {
 
-            withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-
-                bat '''
-                docker run --rm ^
-                -v "%WORKSPACE%:/usr/src" ^
-                -w /usr/src ^
-                sonarsource/sonar-scanner-cli ^
-                -Dsonar.projectKey=devops-sonarqube-project ^
-                -Dsonar.sources=. ^
-                -Dsonar.exclusions=terraform/** ^
-                -Dsonar.host.url=%SONAR_HOST% ^
-                -Dsonar.login=%SONAR_TOKEN%
-                '''
+                waitForQualityGate abortPipeline: true
 
             }
 
         }
+
+    }
+
+    stage('Django Application Validation') {
+
+        steps {
+
+            echo "Validating Django application..."
+
+            bat """
+            python manage.py check
+            """
+
+        }
+
     }
 
     stage('Build Docker Image') {
+
         steps {
 
-            bat '''
-            docker build -t %DOCKER_IMAGE%:%DOCKER_TAG% .
-            '''
+            echo "Building Docker image..."
+
+            bat """
+            docker build -t %DOCKER_IMAGE%:%IMAGE_TAG% .
+            """
 
         }
+
     }
 
     stage('DockerHub Login') {
+
         steps {
 
-            withCredentials([usernamePassword(
-                credentialsId: 'dockerhub-creds',
-                usernameVariable: 'DOCKER_USER',
-                passwordVariable: 'DOCKER_PASS'
-            )]) {
+            echo "Logging into DockerHub..."
 
-                bat '''
-                echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
-                '''
-
-            }
+            bat """
+            docker login -u %DOCKERHUB_CREDS_USR% -p %DOCKERHUB_CREDS_PSW%
+            """
 
         }
+
     }
 
     stage('Push Docker Image') {
+
         steps {
 
-            bat '''
-            docker push %DOCKER_IMAGE%:%DOCKER_TAG%
-            '''
+            echo "Pushing image to DockerHub..."
+
+            bat """
+            docker push %DOCKER_IMAGE%:%IMAGE_TAG%
+            """
 
         }
-    }
 
-    stage('Terraform Init') {
-        steps {
-
-            script {
-
-                if (fileExists('terraform/main.tf')) {
-
-                    bat '''
-                    cd terraform
-                    terraform init
-                    '''
-
-                } else {
-
-                    echo "Terraform file not found, skipping..."
-
-                }
-
-            }
-
-        }
-    }
-
-    stage('Terraform Apply') {
-        steps {
-
-            script {
-
-                if (fileExists('terraform/main.tf')) {
-
-                    bat '''
-                    cd terraform
-                    terraform apply -auto-approve
-                    '''
-
-                } else {
-
-                    echo "Terraform file not found, skipping..."
-
-                }
-
-            }
-
-        }
     }
 
     stage('Deploy to Kubernetes') {
+
         steps {
 
-            bat '''
-            kubectl apply -f k8s/
+            echo "Deploying to Kubernetes cluster..."
 
-            kubectl rollout restart deployment
-
-            kubectl get pods
-            kubectl get svc
-            '''
+            bat """
+            kubectl apply -f kubernetes\\deployment.yaml
+            kubectl apply -f kubernetes\\service.yaml
+            """
 
         }
+
+    }
+
+    stage('Verify Kubernetes Deployment') {
+
+        steps {
+
+            echo "Checking pods..."
+
+            bat "kubectl get pods"
+
+            echo "Checking services..."
+
+            bat "kubectl get svc"
+
+        }
+
+    }
+
+    stage('Kubernetes Rollout Status') {
+
+        steps {
+
+            echo "Checking rollout status..."
+
+            bat """
+            kubectl rollout status deployment/erp-deployment
+            """
+
+        }
+
     }
 
     stage('Monitoring Verification') {
+
         steps {
 
-            bat '''
-            echo Checking SonarQube...
-            docker ps | findstr sonarqube
+            echo "Verifying Prometheus..."
 
-            echo Checking Prometheus...
-            docker ps | findstr prometheus
+            bat """
+            curl %PROMETHEUS_URL%
+            """
 
-            echo Checking Grafana...
-            docker ps | findstr grafana
-            '''
+            echo "Verifying Grafana..."
+
+            bat """
+            curl %GRAFANA_URL%
+            """
 
         }
+
     }
 
 }
@@ -209,11 +224,34 @@ stages {
 post {
 
     success {
-        echo "SUCCESS: CI/CD Pipeline completed successfully"
+
+        echo "====================================="
+        echo "CI/CD PIPELINE EXECUTED SUCCESSFULLY"
+        echo "====================================="
+
+        echo "SonarQube: http://localhost:9000"
+        echo "Prometheus: http://localhost:9090"
+        echo "Grafana: http://localhost:3000"
+
+        echo "Docker Image: %DOCKER_IMAGE%:%IMAGE_TAG%"
+
+        echo "Application deployed successfully!"
+
     }
 
     failure {
-        echo "FAILED: Pipeline failed"
+
+        echo "====================================="
+        echo "PIPELINE FAILED"
+        echo "Check Jenkins console logs"
+        echo "====================================="
+
+    }
+
+    always {
+
+        cleanWs()
+
     }
 
 }
