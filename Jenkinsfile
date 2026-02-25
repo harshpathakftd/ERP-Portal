@@ -105,21 +105,21 @@ stages {
 
     stage('Django Project Validation') {
 
-        steps {
+    steps {
 
-            echo "Validating Django project..."
+        echo "Validating Django project (Windows Docker)..."
 
-            bat """
-            docker run --rm ^
-            -v "%WORKSPACE%:/app" ^
-            -w /app ^
-            python:3.11 ^
-            python manage.py check
-            """
-
-        }
+        bat """
+        docker run --rm ^
+        -v "%WORKSPACE%:/app" ^
+        -w /app ^
+        python:3.11 ^
+        cmd /c "pip install -r erp.txt && python manage.py check"
+        """
 
     }
+
+}
 
     stage('Build Docker Image') {
 
