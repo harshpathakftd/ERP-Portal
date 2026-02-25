@@ -18,14 +18,17 @@ environment {
     IMAGE_TAG = "033"
     DOCKERHUB_CREDS = credentials('dockerhub-creds')
 
-    // SonarQube (Docker container)
+    // SonarQube
     SONAR_HOST = "http://host.docker.internal:9000"
     SONAR_TOKEN = credentials('sonar-token')
 
-    // Kubernetes (Docker Desktop)
+    // Kubernetes
     KUBECONFIG = "C:\\Users\\rahul\\.kube\\config"
 
-    // Monitoring tools (already running containers)
+    // Terraform
+    TERRAFORM_DIR = "terraform"
+
+    // Monitoring
     PROMETHEUS_URL = "http://localhost:9090"
     GRAFANA_URL = "http://localhost:3000"
 
@@ -37,7 +40,7 @@ stages {
 
         steps {
 
-            echo "Cloning source code from Git..."
+            echo "Cloning source code..."
 
             git branch: 'main',
             url: 'https://gitlab.com/SOFTAPP-TECHNOLOGIES/complete-industry-level-devops-ci-cd-pipeline-with-sonarqube.git'
@@ -46,14 +49,25 @@ stages {
 
     }
 
-    stage('Install Python Dependencies') {
+    stage('Install Python Dependencies (Docker Based)') {
 
         steps {
 
-            echo "Installing dependencies..."
+            echo "Installing dependencies using Python Docker container..."
 
             bat """
-            python -m pip install --upgrade pip
+            docker run --rm ^
+            -v "%WORKSPACE%:/app" ^
+            -w /app ^
+            python:3.11 ^
+            pip install --upgrade pip
+            """
+
+            bat """
+            docker run --rm ^
+            -v "%WORKSPACE%:/app" ^
+            -w /app ^
+            python:3.11 ^
             pip install -r erp.txt
             """
 
@@ -61,17 +75,17 @@ stages {
 
     }
 
-    stage('SonarQube Analysis (Docker Scanner)') {
+    stage('SonarQube Analysis') {
 
         steps {
 
-            echo "Running SonarQube analysis..."
+            echo "Running SonarQube scan..."
 
             bat """
             docker run --rm ^
             -v "%WORKSPACE%:/usr/src" ^
             -w /usr/src ^
-            sonarsource/sonar-scanner-cli:latest ^
+            sonarsource/sonar-scanner-cli ^
             -Dsonar.projectKey=erp-project ^
             -Dsonar.projectName=erp-project ^
             -Dsonar.sources=. ^
@@ -98,13 +112,17 @@ stages {
 
     }
 
-    stage('Django Application Validation') {
+    stage('Django Validation (Docker Based)') {
 
         steps {
 
-            echo "Validating Django application..."
+            echo "Running Django validation..."
 
             bat """
+            docker run --rm ^
+            -v "%WORKSPACE%:/app" ^
+            -w /app ^
+            python:3.11 ^
             python manage.py check
             """
 
@@ -118,9 +136,7 @@ stages {
 
             echo "Building Docker image..."
 
-            bat """
-            docker build -t %DOCKER_IMAGE%:%IMAGE_TAG% .
-            """
+            bat "docker build -t %DOCKER_IMAGE%:%IMAGE_TAG% ."
 
         }
 
@@ -130,11 +146,9 @@ stages {
 
         steps {
 
-            echo "Logging into DockerHub..."
+            echo "DockerHub login..."
 
-            bat """
-            docker login -u %DOCKERHUB_CREDS_USR% -p %DOCKERHUB_CREDS_PSW%
-            """
+            bat "docker login -u %DOCKERHUB_CREDS_USR% -p %DOCKERHUB_CREDS_PSW%"
 
         }
 
@@ -144,11 +158,73 @@ stages {
 
         steps {
 
-            echo "Pushing image to DockerHub..."
+            echo "Pushing Docker image..."
 
-            bat """
-            docker push %DOCKER_IMAGE%:%IMAGE_TAG%
-            """
+            bat "docker push %DOCKER_IMAGE%:%IMAGE_TAG%"
+
+        }
+
+    }
+
+    stage('Terraform Init') {
+
+        steps {
+
+            echo "Terraform init..."
+
+            dir("%TERRAFORM_DIR%") {
+
+                bat "terraform init"
+
+            }
+
+        }
+
+    }
+
+    stage('Terraform Validate') {
+
+        steps {
+
+            echo "Terraform validate..."
+
+            dir("%TERRAFORM_DIR%") {
+
+                bat "terraform validate"
+
+            }
+
+        }
+
+    }
+
+    stage('Terraform Plan') {
+
+        steps {
+
+            echo "Terraform plan..."
+
+            dir("%TERRAFORM_DIR%") {
+
+                bat "terraform plan -out=tfplan"
+
+            }
+
+        }
+
+    }
+
+    stage('Terraform Apply') {
+
+        steps {
+
+            echo "Terraform apply..."
+
+            dir("%TERRAFORM_DIR%") {
+
+                bat "terraform apply -auto-approve tfplan"
+
+            }
 
         }
 
@@ -158,7 +234,7 @@ stages {
 
         steps {
 
-            echo "Deploying to Kubernetes cluster..."
+            echo "Deploying to Kubernetes..."
 
             bat """
             kubectl apply -f k8s\\deployment.yaml
@@ -169,15 +245,15 @@ stages {
 
     }
 
-    stage('Verify Kubernetes Deployment') {
+    stage('Verify Deployment') {
 
         steps {
 
-            echo "Checking pods..."
+            echo "Checking Kubernetes pods..."
 
             bat "kubectl get pods"
 
-            echo "Checking services..."
+            echo "Checking Kubernetes services..."
 
             bat "kubectl get svc"
 
@@ -185,15 +261,13 @@ stages {
 
     }
 
-    stage('Kubernetes Rollout Status') {
+    stage('Rollout Status') {
 
         steps {
 
-            echo "Checking rollout status..."
+            echo "Checking rollout..."
 
-            bat """
-            kubectl rollout status deployment/erp-deployment
-            """
+            bat "kubectl rollout status deployment/erp-deployment"
 
         }
 
@@ -203,17 +277,13 @@ stages {
 
         steps {
 
-            echo "Verifying Prometheus..."
+            echo "Checking Prometheus..."
 
-            bat """
-            curl %PROMETHEUS_URL%
-            """
+            bat "curl %PROMETHEUS_URL%"
 
-            echo "Verifying Grafana..."
+            echo "Checking Grafana..."
 
-            bat """
-            curl %GRAFANA_URL%
-            """
+            bat "curl %GRAFANA_URL%"
 
         }
 
@@ -226,25 +296,21 @@ post {
     success {
 
         echo "====================================="
-        echo "CI/CD PIPELINE EXECUTED SUCCESSFULLY"
+        echo "CI/CD PIPELINE SUCCESSFULLY COMPLETED"
         echo "====================================="
 
-        echo "SonarQube: http://localhost:9000"
-        echo "Prometheus: http://localhost:9090"
-        echo "Grafana: http://localhost:3000"
+        echo "SonarQube → http://localhost:9000"
+        echo "Prometheus → http://localhost:9090"
+        echo "Grafana → http://localhost:3000"
 
-        echo "Docker Image: %DOCKER_IMAGE%:%IMAGE_TAG%"
-
-        echo "Application deployed successfully!"
+        echo "Docker Image → %DOCKER_IMAGE%:%IMAGE_TAG%"
+        echo "Kubernetes Deployment → SUCCESS"
 
     }
 
     failure {
 
-        echo "====================================="
-        echo "PIPELINE FAILED"
-        echo "Check Jenkins console logs"
-        echo "====================================="
+        echo "PIPELINE FAILED - CHECK LOGS"
 
     }
 
