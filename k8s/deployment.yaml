@@ -29,7 +29,7 @@ spec:
   containers:
   - name: erp-container
 
-    # Jenkins will update this tag dynamically
+    # Jenkins builds and pushes this image
     image: shivsoftapp/sonar-erp:latest
 
     imagePullPolicy: Always
