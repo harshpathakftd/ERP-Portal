@@ -3,6 +3,8 @@ kind: Service
 
 metadata:
 name: erp-service
+labels:
+app: erp-app
 
 spec:
 type: NodePort
@@ -12,6 +14,7 @@ app: erp-app
 
 ports:
 
+  name: http
   port: 8000
   targetPort: 8000
   nodePort: 30007
