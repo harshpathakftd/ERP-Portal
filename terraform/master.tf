@@ -1,12 +1,10 @@
-#############################################
+########################################
 
-# TERRAFORM MASTER FILE
+# Terraform Kubernetes Deployment File
 
-# Complete Kubernetes Deployment for ERP
+# Jenkins Compatible
 
-# Jenkins + DockerHub + Kubernetes Compatible
-
-#############################################
+########################################
 
 terraform {
 
@@ -16,11 +14,8 @@ required_providers {
 
 ```
 kubernetes = {
-
   source  = "hashicorp/kubernetes"
-
   version = "~> 2.23"
-
 }
 ```
 
@@ -28,11 +23,25 @@ kubernetes = {
 
 }
 
-#############################################
+########################################
 
-# PROVIDER CONFIGURATION
+# Variables from Jenkins
 
-#############################################
+########################################
+
+variable "docker_image" {
+type = string
+}
+
+variable "image_tag" {
+type = string
+}
+
+########################################
+
+# Kubernetes Provider
+
+########################################
 
 provider "kubernetes" {
 
@@ -40,137 +49,50 @@ config_path = "C:/Users/rahul/.kube/config"
 
 }
 
-#############################################
+########################################
 
-# VARIABLES
+# Deployment
 
-#############################################
+########################################
 
-variable "app_name" {
-
-description = "Application Name"
-
-default = "erp-project"
-
-}
-
-variable "docker_image" {
-
-description = "Docker Image Name"
-
-default = "shivsoftapp/sonar-erp"
-
-}
-
-variable "image_tag" {
-
-description = "Docker Image Tag from Jenkins"
-
-default = "latest"
-
-}
-
-variable "replicas" {
-
-default = 2
-
-}
-
-variable "container_port" {
-
-default = 8000
-
-}
-
-variable "node_port" {
-
-default = 30007
-
-}
-
-#############################################
-
-# KUBERNETES DEPLOYMENT
-
-#############################################
-
-resource "kubernetes_deployment" "erp_deployment" {
+resource "kubernetes_deployment" "erp" {
 
 metadata {
-
-```
-name = var.app_name
-
+name = "erp-deployment"
 labels = {
-
-  app = var.app_name
-
+app = "erp-app"
 }
-```
-
 }
 
 spec {
 
 ```
-replicas = var.replicas
+replicas = 2
 
 selector {
-
   match_labels = {
-
-    app = var.app_name
-
+    app = "erp-app"
   }
-
 }
 
 template {
 
   metadata {
-
     labels = {
-
-      app = var.app_name
-
+      app = "erp-app"
     }
-
   }
 
   spec {
 
     container {
 
-      name  = var.app_name
+      name  = "erp-container"
 
       image = "${var.docker_image}:${var.image_tag}"
 
-      image_pull_policy = "Always"
-
       port {
-
-        container_port = var.container_port
-
-      }
-
-      resources {
-
-        limits = {
-
-          cpu    = "500m"
-
-          memory = "512Mi"
-
-        }
-
-        requests = {
-
-          cpu    = "250m"
-
-          memory = "256Mi"
-
-        }
-
+        container_port = 8000
       }
 
     }
@@ -184,39 +106,29 @@ template {
 
 }
 
-#############################################
+########################################
 
-# KUBERNETES SERVICE
+# Service
 
-#############################################
+########################################
 
 resource "kubernetes_service" "erp_service" {
 
 metadata {
-
-```
-name = "${var.app_name}-service"
-```
-
+name = "erp-service"
 }
 
 spec {
 
 ```
 selector = {
-
-  app = var.app_name
-
+  app = "erp-app"
 }
 
 port {
-
-  port        = 80
-
-  target_port = var.container_port
-
-  node_port   = var.node_port
-
+  port        = 8000
+  target_port = 8000
+  node_port   = 30007
 }
 
 type = "NodePort"
@@ -225,33 +137,3 @@ type = "NodePort"
 }
 
 }
-
-#############################################
-
-# OUTPUTS
-
-#############################################
-
-output "deployment_name" {
-
-value = kubernetes_deployment.erp_deployment.metadata[0].name
-
-}
-
-output "service_name" {
-
-value = kubernetes_service.erp_service.metadata[0].name
-
-}
-
-output "service_url" {
-
-value = "[http://localhost:${var.node_port}](http://localhost:${var.node_port})"
-
-}
-
-#############################################
-
-# END OF FILE
-
-#############################################
