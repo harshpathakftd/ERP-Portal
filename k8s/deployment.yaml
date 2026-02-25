@@ -20,19 +20,16 @@ matchLabels:
 app: erp-app
 
 template:
-
-
 metadata:
-  labels:
-    app: erp-app
+labels:
+app: erp-app
+
 
 spec:
-
   containers:
-
   - name: erp-container
 
-    # Jenkins will dynamically update this image tag
+    # Jenkins will update this tag dynamically
     image: shivsoftapp/sonar-erp:latest
 
     imagePullPolicy: Always
@@ -40,7 +37,6 @@ spec:
     ports:
     - containerPort: 8000
 
-    # Resource limits (important for production)
     resources:
       requests:
         memory: "256Mi"
@@ -49,7 +45,6 @@ spec:
         memory: "512Mi"
         cpu: "500m"
 
-    # Health check
     livenessProbe:
       httpGet:
         path: /
