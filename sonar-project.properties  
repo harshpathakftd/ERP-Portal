@@ -1,0 +1,44 @@
+# ================================
+
+# SONARQUBE PROJECT CONFIGURATION
+
+# ================================
+
+# Project identification
+
+sonar.projectKey=erp-project
+sonar.projectName=ERP Project
+sonar.projectVersion=3.3
+
+# Source code location
+
+sonar.sources=.
+
+# Language
+
+sonar.language=py
+sonar.python.version=3.11
+
+# Encoding
+
+sonar.sourceEncoding=UTF-8
+
+# Exclusions (important for clean scan)
+
+sonar.exclusions=**/**pycache**/**,**/migrations/**,**/*.pyc,**/venv/**,**/env/**,**/.git/**,**/node_modules/**,**/terraform/.terraform/**
+
+# Test exclusions
+
+sonar.test.exclusions=**/tests/**
+
+# Coverage report path (optional future use)
+
+sonar.python.coverage.reportPaths=coverage.xml
+
+# SCM
+
+sonar.scm.provider=git
+
+# Quality Gate
+
+sonar.qualitygate.wait=false
