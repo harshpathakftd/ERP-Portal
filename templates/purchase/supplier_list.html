@@ -1,11 +1,32 @@
-<h2>Supplier List</h2>
+{% extends "base.html" %}
 
-{% for supplier in suppliers %}
+{% block title %}Suppliers | ERP{% endblock %}
+{% block page_heading %}Supplier List{% endblock %}
+{% block page_subheading %}Vendor directory and contact information{% endblock %}
 
-<p>Name: {{ supplier.name }}</p>
-<p>Email: {{ supplier.email }}</p>
-<p>Phone: {{ supplier.phone }}</p>
-
-<hr>
-
-{% endfor %}
+{% block content %}
+<div class="card table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for supplier in suppliers %}
+            <tr>
+                <td>{{ supplier.name }}</td>
+                <td>{{ supplier.email }}</td>
+                <td>{{ supplier.phone }}</td>
+            </tr>
+        {% empty %}
+            <tr>
+                <td colspan="3" class="empty">No suppliers found</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,37 +1,38 @@
-<!DOCTYPE html>
-<html>
-<head>
-<title>Payroll List</title>
-</head>
+{% extends "base.html" %}
 
-<body>
+{% block title %}Payroll | ERP{% endblock %}
+{% block page_heading %}Payroll List{% endblock %}
+{% block page_subheading %}Salary, bonus and deduction records{% endblock %}
 
-<h2>Payroll List</h2>
-
-{% for payroll in payrolls %}
-
-<hr>
-
-<p>Employee: {{ payroll.employee.user.username }}</p>
-
-<p>Basic Salary: {{ payroll.basic_salary }}</p>
-
-<p>Bonus: {{ payroll.bonus }}</p>
-
-<p>Deduction: {{ payroll.deduction }}</p>
-
-<p>Net Salary: {{ payroll.net_salary }}</p>
-
-<p>Pay Date: {{ payroll.pay_date }}</p>
-
-{% empty %}
-
-<p>No payroll records found</p>
-
-{% endfor %}
-
-<br>
-<a href="/dashboard/">Back to Dashboard</a>
-
-</body>
-</html>
+{% block content %}
+<div class="card table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Employee</th>
+                <th>Basic Salary</th>
+                <th>Bonus</th>
+                <th>Deduction</th>
+                <th>Net Salary</th>
+                <th>Pay Date</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for payroll in payrolls %}
+            <tr>
+                <td>{{ payroll.employee.user.username }}</td>
+                <td>{{ payroll.basic_salary }}</td>
+                <td>{{ payroll.bonus }}</td>
+                <td>{{ payroll.deduction }}</td>
+                <td>{{ payroll.net_salary }}</td>
+                <td>{{ payroll.pay_date }}</td>
+            </tr>
+        {% empty %}
+            <tr>
+                <td colspan="6" class="empty">No payroll records found</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

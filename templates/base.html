@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ERP System{% endblock %}</title>
+    <style>
+        :root {
+            --bg: #f3f5fb;
+            --surface: #ffffff;
+            --surface-soft: #f8f9ff;
+            --text: #111827;
+            --muted: #6b7280;
+            --primary: #4f46e5;
+            --primary-dark: #4338ca;
+            --border: #e5e7eb;
+            --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 260px;
+            background: linear-gradient(180deg, #111827 0%, #1f2937 100%);
+            color: #fff;
+            padding: 22px 14px;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+        }
+
+        .brand {
+            padding: 10px 12px 22px 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+            margin-bottom: 14px;
+        }
+
+        .brand h2 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .brand p {
+            margin: 6px 0 0 0;
+            color: #cbd5e1;
+            font-size: 12px;
+        }
+
+        .nav-link {
+            display: block;
+            color: #e5e7eb;
+            text-decoration: none;
+            padding: 11px 12px;
+            border-radius: 10px;
+            margin-bottom: 6px;
+            transition: background-color 0.2s ease;
+        }
+
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.14);
+        }
+
+        .main {
+            flex: 1;
+            padding: 28px;
+        }
+
+        .topbar {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            border-radius: 14px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .topbar h1 {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        .topbar p {
+            margin: 4px 0 0 0;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            border-radius: 14px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        thead {
+            background: var(--surface-soft);
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 12px 10px;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+        }
+
+        td {
+            color: #334155;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 9px;
+            border-radius: 999px;
+            font-size: 12px;
+            background: #e0e7ff;
+            color: #3730a3;
+            font-weight: 600;
+        }
+
+        .empty {
+            margin: 0;
+            color: var(--muted);
+        }
+
+        .btn {
+            display: inline-block;
+            text-decoration: none;
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .btn:hover {
+            background: var(--primary-dark);
+        }
+
+        @media (max-width: 900px) {
+            .layout {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: static;
+            }
+
+            .main {
+                padding: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="layout">
+    <aside class="sidebar">
+        <div class="brand">
+            <h2>ERP Suite</h2>
+            <p>Business operations panel</p>
+        </div>
+
+        <a class="nav-link" href="/dashboard/">Dashboard</a>
+        <a class="nav-link" href="/companies/">Companies</a>
+        <a class="nav-link" href="/hrm/employees/">Employees</a>
+        <a class="nav-link" href="/inventory/products/">Products</a>
+        <a class="nav-link" href="/sales/orders/">Orders</a>
+        <a class="nav-link" href="/purchase/suppliers/">Suppliers</a>
+        <a class="nav-link" href="/purchase/purchases/">Purchases</a>
+        <a class="nav-link" href="/finance/invoices/">Invoices</a>
+        <a class="nav-link" href="/payroll/payrolls/">Payroll</a>
+        <a class="nav-link" href="/logout/">Logout</a>
+    </aside>
+
+    <main class="main">
+        <div class="topbar">
+            <div>
+                <h1>{% block page_heading %}ERP Dashboard{% endblock %}</h1>
+                <p>{% block page_subheading %}Track operations in one place{% endblock %}</p>
+            </div>
+        </div>
+
+        {% block content %}{% endblock %}
+    </main>
+</div>
+</body>
+</html>
